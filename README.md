@@ -20,7 +20,7 @@ the whole command line.
 
 A multi command with multiple ```<name>```:
 
-    "mkdir /home/more/Projects/<name>; cd /home/mora/Projects/<name>"
+    "mkdir /home/mora/Projects/<name>; cd /home/mora/Projects/<name>"
     
 As you can see from the above example, multiple commands seperated by a ';', and the use of multipe ```<name>``` entries.
 
