@@ -5,8 +5,26 @@ python3-tk
 git://github.com/rshk/python-libxdo
 ```
 # tvm.py
+ 
+tvm.py: Is a  python script that uses tkined to simulate a macropad. Each label is also a button that can be selected with a mouse. Upon first startup 
+you are prompted to select a window to send commads to. There are 4 options for how to handle what to do with each command upon a button press,
 
-tvm.py: Is a  python script that uses tkined to simulate a macropad. A configuration file is used to create labels and commands for each label.
+0. Select a new window to send commands to
+1. Spawn a new window
+2. Use window  the was configured at the beginning of the tvm.py script
+3. Don't need a window
+
+Commands can accept input by using the keyword ```<name>``` int the command in the config file. This will cause a window to pop  up and prompt
+for input. You can have multiple commands seperated by ';'. each command can have a ```<name>``` prompt, but there will be just one prompt for
+the whole command line.
+
+A multi command with multiple ```<name>```:
+
+    "mkdir /home/mora/Projects/<name>; cd /home/mora/Projects/<name>"
+    
+As you can see from the above example, multiple commands seperated by a ';', and the use of multipe ```<name>``` entries.
+
+A configuration file is used to create labels and commands for each label.
 
 An example configuration file ***src/tvm_config.py***:
 ```
@@ -71,3 +89,4 @@ Categories = {
 ##Main Screen and Vi Commands:
 
 ![Example Main Screen and Vi Commands](docs/main_and_Vi_CMDs.png "Example Main Screen and Vi Commands")
+
