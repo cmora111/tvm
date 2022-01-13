@@ -51,17 +51,23 @@ Categories = {
     }
 }
 ```
-###Main Screen
+
+##Main Screen:
+
 ![Example Main Screen](docs/main.png "Example Main Screen")
 
-###Main Screen and Admin_CMDs Screen
+##Main Screen and Admin_CMDs Screen:
+
 ![Example Main Screen and Admin Commands](docs/main_and_Admin_CMDs.png "Example Main Screen and Admin  Commands")
 
-###Main Screen and APT_CMDs Screen
+##Main Screen and APT_CMDs Screen:
+
 ![Example Main Screen and APT Commands](docs/main_and_APT_CMDs.png "Example Main Screen and APT  Commands")
 
-###Main Screen and Applications Screen
+##Main Screen and Applications Screen:
+
 ![Example Main Screen and Aplications](docs/main_and_Aplications.png "Example Main Screen and Aplications")
 
-###Main Screen and Vi Commands
+##Main Screen and Vi Commands:
+
 ![Example Main Screen and Vi Commands](docs/main_and_Vi_CMDs.png "Example Main Screen and Vi Commands")
