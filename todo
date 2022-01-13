@@ -1,0 +1,58 @@
+# import platform is probably better that sys.platform
+# import platform
+# import os
+# os.name:
+#     on windows: nt
+#     on ubuntu: posix
+#     on mac: posix
+# platform.system()
+#     on windows: Windows
+#     on ubuntu: Linux
+#     on mac: Darwin
+# platform.release()
+#     on windows: 10
+#     on ubuntu: 
+#     on mac: 8.11.1
+#
+#
+# From winndows:
+# import sys, win32com.client
+# shell = win32com.client.Dispatch("WScript.Shell")
+# Now, we open a command window, change the path to C:\, and execute a dir:
+#
+# shell.Run("cmd /K CD C:\ & Dir")
+# 
+# Run a script
+#WshShell.Run("powershell -file C:\\MyScript.ps1")
+#
+# Run one command
+# WshShell.Run("powershell -command echo Test")
+
+(https://helloacm.com/send-keystrokes-to-the-active-window-using-sendkeys-wsh/)
+
+The following runs the notepad.exe and bring the notepad to the front. The second parameter 9 means: to active and display the window. If the window is minimized or maximized, the system restores it to its original size and position.
+
+
+Set WshShell = WScript.CreateObject("WScript.Shell")
+WshShell.Run "notepad", 9
+
+Now the following will type in Hello, World! one character after another, with a short pause 200ms between characters. And finally, it will simulate Alt+F4 to exit. At this time, the dialog will pop up for saving, and press Tab to navigate to Don’t Save button and press Enter to exit.
+
+
+' Give Notepad time to load
+WScript.Sleep 500
+
+Dim Msg: Msg = "Hello, World!"
+
+' Type in One Character at a time
+For i = 1 To Len(Msg)
+    WScript.Sleep 200
+    WshShell.SendKeys Mid(Msg, i, 1)
+Next
+
+WshShell.SendKeys "{ENTER}"
+WshShell.SendKeys "%{F4}"
+WshShell.SendKeys "{TAB}"
+WshShell.SendKeys "{ENTER}"
+
+See image: vbs-sendkeys.png

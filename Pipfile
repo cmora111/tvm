@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+python-libxdo = {ref = "master", git = "git://github.com/rshk/python-libxdo"}
+python3-tk = "3.8.10"
+
+[dev-packages]
+
+[requires]
+python_version = "3.8.10"
+
