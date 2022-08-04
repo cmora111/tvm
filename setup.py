@@ -31,6 +31,6 @@ setup(
     include_package_data=False,
     install_requires=[
         "python_version == 3.8",
-        "python-libxdo @ git+htts://git@github.coom/rshk/python-libxdo"
+        "python-libxdo @ git+https://git@github.coom/rshk/python-libxdo"
     ]
     )
