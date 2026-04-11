@@ -13,12 +13,12 @@ from tkinter import Button, Entry, Frame, Label, StringVar, Tk, Toplevel, messag
 APP_NAME = "TVM"
 CONFIG_DIR = Path.home() / ".config" / "tvm"
 CONFIG_FILE = CONFIG_DIR / "config.py"
+PLUGIN_DIR = CONFIG_DIR / "plugins"
 LOG_FILE = CONFIG_DIR / "tvm.log"
-XDO_TIMEOUT_SECONDS = 12
+HELPER_TIMEOUT_SECONDS = 15
 
-
-# Logging is intentionally initialized early so startup and helper errors are captured.
-LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
@@ -28,6 +28,7 @@ logging.basicConfig(
 
 class TVMError(RuntimeError):
     """Application-level error for expected failures."""
+
 
 
 def load_config():
@@ -52,11 +53,14 @@ class TVMApp:
         self.debug = bool(getattr(cfg, "debug", {}).get("Flag", False))
         self.application = getattr(cfg, "terminal", {}).get("application", "gnome-terminal")
         self.window_id: int | str | None = None
+        self.plugins = self.load_plugins()
 
         if self.debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
         self.log("TVM starting")
+        if self.plugins:
+            self.log(f"Loaded plugins: {', '.join(sorted(self.plugins.keys()))}")
         self.build_main()
         self.root.after(250, self.safe_initial_select)
 
@@ -71,6 +75,28 @@ class TVMApp:
             self.root.quit()
         finally:
             self.root.destroy()
+
+    def load_plugins(self) -> dict[str, object]:
+        plugins: dict[str, object] = {}
+
+        if not PLUGIN_DIR.exists():
+            return plugins
+
+        for file in sorted(PLUGIN_DIR.glob("*.py")):
+            name = file.stem
+            try:
+                spec = importlib.util.spec_from_file_location(f"tvm_user_plugin_{name}", file)
+                if not spec or not spec.loader:
+                    raise TVMError(f"Could not load plugin spec for '{name}'.")
+
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                plugins[name] = module
+            except Exception as exc:
+                logging.exception("Failed to load plugin '%s' from %s", name, file)
+                self.log(f"Failed to load plugin '{name}': {exc}")
+
+        return plugins
 
     def build_main(self) -> None:
         frame = Frame(self.root, padx=8, pady=8)
@@ -141,7 +167,7 @@ class TVMApp:
 
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
         cmd_type, cmd = self.cfg.Categories[category][subcategory]
-        if "" in cmd:
+        if isinstance(cmd, str) and "" in cmd:
             self.prompt_window(cmd_type, cmd)
         else:
             self.run_cmd(cmd_type, cmd, parent_window)
@@ -173,9 +199,9 @@ class TVMApp:
         except Exception as exc:
             self.log(f"Initial selection skipped: {exc}")
 
-    def _run_xdo_helper(self, payload: dict) -> dict:
+    def _run_helper(self, payload: dict) -> dict:
         command = [sys.executable, "-m", "tvm.xdo_helper"]
-        self.log(f"Running xdo helper action={payload.get('action')} payload={payload}")
+        self.log(f"Running helper action={payload.get('action')} payload={payload}")
 
         try:
             proc = subprocess.run(
@@ -184,45 +210,40 @@ class TVMApp:
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=XDO_TIMEOUT_SECONDS,
+                timeout=HELPER_TIMEOUT_SECONDS,
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            raise TVMError("xdo helper timed out.") from exc
-        except Exception as exc:  # pragma: no cover - defensive wrapper for system issues
-            raise TVMError(f"Could not start xdo helper: {exc}") from exc
+            raise TVMError("helper timed out") from exc
+        except Exception as exc:
+            raise TVMError(f"Could not start helper: {exc}") from exc
 
         stdout = (proc.stdout or "").strip()
         stderr = (proc.stderr or "").strip()
-
         if stderr:
-            logging.warning("xdo helper stderr: %s", stderr)
+            logging.warning("helper stderr: %s", stderr)
 
-        if proc.returncode != 0:
+        if proc.returncode != 0 and not stdout:
             raise TVMError(
-                f"xdo helper exited with code {proc.returncode}."
-                + (f" Details: {stderr}" if stderr else "")
+                f"helper exited with code {proc.returncode}" + (f": {stderr}" if stderr else "")
             )
 
         if not stdout:
-            raise TVMError(
-                "xdo helper returned no data. The native xdo library may have crashed."
-            )
+            raise TVMError("helper returned no data")
 
         try:
             result = json.loads(stdout)
         except json.JSONDecodeError as exc:
-            raise TVMError(f"xdo helper returned invalid JSON: {stdout!r}") from exc
+            raise TVMError(f"helper returned invalid JSON: {stdout!r}") from exc
 
         if result.get("status") != "ok":
-            raise TVMError(result.get("error", "xdo helper reported an unknown error."))
-
+            raise TVMError(result.get("error", "helper reported an unknown error"))
         return result
 
     def select_target_window(self) -> None:
         self.root.withdraw()
         try:
-            result = self._run_xdo_helper({"action": "select_window"})
+            result = self._run_helper({"action": "select_window"})
         finally:
             self.root.deiconify()
             self.root.lift()
@@ -235,7 +256,7 @@ class TVMApp:
         self.window_id = selected
         self.log(f"Selected window: {self.window_id}")
 
-    def run_cmd(self, cmd_type: int, cmd: str, current_window=None) -> None:
+    def run_cmd(self, cmd_type, cmd, current_window=None) -> None:
         try:
             if current_window is not None and current_window.winfo_exists():
                 current_window.destroy()
@@ -243,15 +264,47 @@ class TVMApp:
             if cmd_type == 0:
                 self.select_target_window()
             elif cmd_type == 1:
-                self.spawn_terminal(cmd)
+                self.spawn_terminal(str(cmd))
             elif cmd_type == 2:
-                self.send_to_selected_window(cmd)
+                self.send_to_selected_window(str(cmd))
             elif cmd_type == 3:
-                self.run_detached(cmd)
+                self.run_detached(str(cmd))
+            elif cmd_type == "plugin":
+                self.run_plugin(cmd)
             else:
                 raise TVMError(f"Unknown command type: {cmd_type}")
         except Exception as exc:
             self.show_error("Command failed", f"{exc}\n\n{traceback.format_exc()}")
+
+    def run_plugin(self, cmd) -> None:
+        if isinstance(cmd, str):
+            plugin_name = cmd
+            plugin_args = {}
+        elif isinstance(cmd, dict):
+            plugin_name = cmd.get("plugin") or cmd.get("name")
+            plugin_args = dict(cmd)
+        else:
+            raise TVMError("Plugin command must be a plugin name or dict.")
+
+        if not plugin_name:
+            raise TVMError("Plugin command did not specify a plugin name.")
+
+        plugin = self.plugins.get(plugin_name)
+        if plugin is None:
+            raise TVMError(f"Plugin '{plugin_name}' was not found in {PLUGIN_DIR}.")
+
+        run_fn = getattr(plugin, "run", None)
+        if not callable(run_fn):
+            raise TVMError(f"Plugin '{plugin_name}' does not define run(app, context).")
+
+        context = {
+            "window_id": self.window_id,
+            "config": self.cfg,
+            "plugin_dir": PLUGIN_DIR,
+            "args": plugin_args,
+        }
+        self.log(f"Running plugin '{plugin_name}' with args={plugin_args}")
+        run_fn(self, context)
 
     def spawn_terminal(self, cmd: str) -> None:
         self.log(f"Spawning terminal command via {self.application}: {cmd}")
@@ -267,7 +320,7 @@ class TVMApp:
 
         self.log(f"Sending command to window {self.window_id}: {cmd}")
         try:
-            self._run_xdo_helper(
+            self._run_helper(
                 {
                     "action": "send",
                     "window_id": self.window_id,
@@ -283,7 +336,7 @@ class TVMApp:
             self.window_id = None
             raise TVMError(
                 "Could not send command to the selected window. "
-                "The target may have closed or the xdo call failed. Re-select the window and try again."
+                "The target may have closed or the X11 helper failed. Re-select the window and try again."
             ) from exc
 
     @staticmethod
