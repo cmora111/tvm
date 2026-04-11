@@ -53,7 +53,9 @@ class TVMApp:
         self.debug = bool(getattr(cfg, "debug", {}).get("Flag", False))
         self.application = getattr(cfg, "terminal", {}).get("application", "gnome-terminal")
         self.window_id: int | str | None = None
-        self.plugins = self.load_plugins()
+        self.plugins: dict[str, object] = {}
+        self.plugin_mtimes: dict[str, float] = {}
+        self.load_plugins(force=True)
 
         if self.debug:
             logging.getLogger().setLevel(logging.DEBUG)
@@ -76,27 +78,61 @@ class TVMApp:
         finally:
             self.root.destroy()
 
-    def load_plugins(self) -> dict[str, object]:
+    def load_plugins(self, force: bool = False) -> dict[str, object]:
         plugins: dict[str, object] = {}
+        mtimes: dict[str, float] = {}
 
         if not PLUGIN_DIR.exists():
-            return plugins
+            self.plugins = {}
+            self.plugin_mtimes = {}
+            return self.plugins
 
         for file in sorted(PLUGIN_DIR.glob("*.py")):
             name = file.stem
             try:
-                spec = importlib.util.spec_from_file_location(f"tvm_user_plugin_{name}", file)
+                stat = file.stat()
+                mtimes[name] = stat.st_mtime
+
+                if not force and name in self.plugins and self.plugin_mtimes.get(name) == stat.st_mtime:
+                    plugins[name] = self.plugins[name]
+                    continue
+
+                spec = importlib.util.spec_from_file_location(
+                    f"tvm_user_plugin_{name}_{int(stat.st_mtime_ns)}", file
+                )
                 if not spec or not spec.loader:
                     raise TVMError(f"Could not load plugin spec for '{name}'.")
 
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 plugins[name] = module
+                self.log(f"Loaded plugin '{name}'")
             except Exception as exc:
                 logging.exception("Failed to load plugin '%s' from %s", name, file)
                 self.log(f"Failed to load plugin '{name}': {exc}")
 
-        return plugins
+        removed = sorted(set(self.plugins) - set(plugins))
+        for name in removed:
+            self.log(f"Removed plugin '{name}'")
+
+        self.plugins = plugins
+        self.plugin_mtimes = mtimes
+        return self.plugins
+
+    def reload_plugins(self) -> None:
+        before = set(self.plugins)
+        self.load_plugins(force=False)
+        after = set(self.plugins)
+        loaded = sorted(after - before)
+        reloaded = sorted(name for name in after & before if self.plugin_mtimes.get(name))
+        parts: list[str] = []
+        if loaded:
+            parts.append(f"new: {', '.join(loaded)}")
+        if reloaded:
+            parts.append(f"available: {', '.join(reloaded)}")
+        if not parts:
+            parts.append("No plugins found.")
+        self.log("Plugin refresh complete")
 
     def build_main(self) -> None:
         frame = Frame(self.root, padx=8, pady=8)
@@ -121,6 +157,15 @@ class TVMApp:
                 fg="yellow",
                 command=lambda c=category: self.open_category(c),
             ).pack(pady=2)
+
+        Button(
+            frame,
+            text="Reload Plugins",
+            width=20,
+            bg="navy",
+            fg="white",
+            command=self.reload_plugins_with_notice,
+        ).pack(pady=(8, 2))
 
         Button(
             frame,
@@ -277,6 +322,8 @@ class TVMApp:
             self.show_error("Command failed", f"{exc}\n\n{traceback.format_exc()}")
 
     def run_plugin(self, cmd) -> None:
+        self.load_plugins(force=False)
+
         if isinstance(cmd, str):
             plugin_name = cmd
             plugin_args = {}
@@ -305,6 +352,32 @@ class TVMApp:
         }
         self.log(f"Running plugin '{plugin_name}' with args={plugin_args}")
         run_fn(self, context)
+
+    def reload_plugins_with_notice(self) -> None:
+        old_names = set(self.plugins)
+        old_mtimes = dict(self.plugin_mtimes)
+        self.load_plugins(force=False)
+        new_names = set(self.plugins)
+
+        added = sorted(new_names - old_names)
+        removed = sorted(old_names - new_names)
+        changed = sorted(
+            name
+            for name in (new_names & old_names)
+            if self.plugin_mtimes.get(name) != old_mtimes.get(name)
+        )
+
+        parts: list[str] = []
+        if added:
+            parts.append(f"Added: {', '.join(added)}")
+        if changed:
+            parts.append(f"Reloaded: {', '.join(changed)}")
+        if removed:
+            parts.append(f"Removed: {', '.join(removed)}")
+        if not parts:
+            parts.append("No plugin changes detected.")
+
+        messagebox.showinfo("Plugins", "\n".join(parts))
 
     def spawn_terminal(self, cmd: str) -> None:
         self.log(f"Spawning terminal command via {self.application}: {cmd}")
