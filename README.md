@@ -2,13 +2,6 @@
 
 TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a selected terminal window.
 
-It allows you to:
-
-* Select any X11 window
-* Send predefined commands
-* Run scripts/macros quickly
-* Extend behavior via plugins
-
 ---
 
 ## 🚀 Features
@@ -18,6 +11,7 @@ It allows you to:
 * Command execution via `xdotool`
 * Configurable button grid
 * Plugin system (extensible actions)
+* Desktop launcher support
 * Works on Ubuntu / Xorg
 
 ---
@@ -27,11 +21,6 @@ It allows you to:
 * Linux (Xorg session)
 * Python 3.10+
 * External tools:
-
-  * `xdotool`
-  * `x11-utils`
-
-Install dependencies:
 
 ```bash
 sudo apt install xdotool x11-utils
@@ -46,7 +35,6 @@ Using pipx:
 ```bash
 sudo apt install pipx
 pipx ensurepath
-
 pipx install tvm
 ```
 
@@ -63,7 +51,6 @@ tvm
 ```bash
 git clone https://github.com/cmora111/tvm
 cd tvm
-
 pipx install -e .
 ```
 
@@ -83,7 +70,7 @@ TVM loads config from:
 ~/.config/tvm/config.py
 ```
 
-Create it from the example:
+Create it:
 
 ```bash
 mkdir -p ~/.config/tvm
@@ -94,30 +81,64 @@ cp examples/config.py ~/.config/tvm/config.py
 
 ## 🧩 Plugin System
 
-TVM supports plugins for custom actions.
+Plugins allow you to extend TVM with custom actions.
 
-### Plugin location:
+### Plugin Directory
 
 ```text
 ~/.config/tvm/plugins/
 ```
 
-### Example plugin:
+Each plugin must define:
 
 ```python
-# ~/.config/tvm/plugins/hello.py
-
 def run(app, context):
-    print("Hello from plugin!")
+    ...
 ```
 
-### Use in config:
+---
+
+## 🧩 Plugin Example
+
+Create a plugin:
+
+```bash
+mkdir -p ~/.config/tvm/plugins
+nano ~/.config/tvm/plugins/hello.py
+```
+
+```python
+def run(app, context):
+    message = context.get("args", {}).get("message", "Hello from TVM!")
+
+    window_id = context.get("window_id")
+
+    if window_id:
+        app.send_text_to_window(f'echo "{message}"')
+
+    print(message)
+```
+
+Add a button in your config:
 
 ```python
 {
     "label": "Hello",
     "type": "plugin",
     "plugin": "hello"
+}
+```
+
+Example with arguments:
+
+```python
+{
+    "label": "Custom Message",
+    "type": "plugin",
+    "plugin": "hello",
+    "args": {
+        "message": "This came from config!"
+    }
 }
 ```
 
@@ -151,8 +172,6 @@ Make executable:
 chmod +x ~/.local/share/applications/tvm.desktop
 ```
 
-Now TVM will appear in your app launcher.
-
 ---
 
 ## 📁 Project Structure
@@ -176,32 +195,30 @@ tvm/
 
 ## 🧠 How It Works
 
-TVM does **not** directly control windows via Python bindings.
+TVM uses external X11 tools for stability:
 
-Instead it:
-
-1. Uses `xwininfo` to select a window
-2. Uses `xdotool` to send input
-3. Runs these in a subprocess for stability
-
-This avoids crashes caused by native bindings.
+1. `xwininfo` — select window
+2. `xdotool` — send commands
+3. Subprocess isolation — prevents crashes
 
 ---
 
 ## 🐞 Troubleshooting
 
-### Nothing happens when sending commands
+### Nothing happens
 
-* Make sure the window still exists
-* Try reselecting it
+* Reselect the window
+* Ensure terminal is focused
 
-### TVM doesn’t launch from menu
+### Not launching from menu
 
-* Run `update-desktop-database`
+```bash
+update-desktop-database ~/.local/share/applications
+```
 
-### Wayland issues
+### Wayland
 
-TVM currently requires Xorg.
+TVM requires Xorg
 
 ---
 
@@ -229,7 +246,7 @@ MIT License
 
 ## 🙌 Contributing
 
-PRs and ideas welcome.
+PRs welcome.
 
 ---
 
@@ -237,7 +254,7 @@ PRs and ideas welcome.
 
 * [ ] Wayland support
 * [ ] Macro recording
-* [ ] Visual window selector overlay
 * [ ] Plugin marketplace
 * [ ] Profiles/workspaces
+* [ ] Visual window picker
 
