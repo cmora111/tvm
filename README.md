@@ -4,24 +4,25 @@ TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a s
 
 ---
 
-## 🚀 Features
+## Features
 
-* GUI-based macropad
-* Click-to-select target window
-* Command execution via `xdotool`
-* Configurable button grid
-* 🧩 Plugin system (extensible actions)
-* 🔄 Plugin hot-reload (no restart required)
-* 🖥️ Desktop launcher support
-* Works on Ubuntu / Xorg
+- GUI-based macropad
+- Click-to-select target window
+- Command execution via `xdotool`
+- Configurable button categories
+- Plugin system with hot reload
+- Visual button editor built into the app
+- Macro recorder built into the app
+- Desktop launcher support
+- Works on Ubuntu / Xorg
 
 ---
 
-## ⚠️ Requirements
+## Requirements
 
-* Linux (Xorg session)
-* Python 3.10+
-* External tools:
+- Linux (Xorg session)
+- Python 3.10+
+- External tools:
 
 ```bash
 sudo apt install xdotool x11-utils
@@ -29,9 +30,9 @@ sudo apt install xdotool x11-utils
 
 ---
 
-## 📦 Installation (Recommended)
+## Installation
 
-Using pipx:
+Recommended with pipx:
 
 ```bash
 sudo apt install pipx
@@ -45,9 +46,7 @@ Run:
 tvm
 ```
 
----
-
-## 🧪 Development Mode
+Development install:
 
 ```bash
 git clone https://github.com/cmora111/tvm
@@ -55,7 +54,7 @@ cd tvm
 pipx install -e .
 ```
 
-Or without installing:
+Run without installing:
 
 ```bash
 PYTHONPATH=src python3 -m tvm
@@ -63,7 +62,7 @@ PYTHONPATH=src python3 -m tvm
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 TVM loads config from:
 
@@ -71,7 +70,7 @@ TVM loads config from:
 ~/.config/tvm/config.py
 ```
 
-Create it:
+Create it from the example:
 
 ```bash
 mkdir -p ~/.config/tvm
@@ -80,11 +79,84 @@ cp examples/config.py ~/.config/tvm/config.py
 
 ---
 
-## 🧩 Plugin System
+## Command Types
 
-Plugins allow you to extend TVM with custom actions.
+TVM supports these built-in command types:
 
-### 📁 Plugin Directory
+```text
+select_window
+spawn_terminal
+send_to_window
+run_detached
+plugin
+macro
+```
+
+The first four map to the original numeric command types automatically, so older configs continue to work.
+
+---
+
+## Visual Button Editor
+
+Use the **Edit Buttons** button in the main window to open the built-in editor.
+
+You can:
+- create new buttons
+- rename buttons
+- move a button to a different category
+- change the command type
+- edit plain commands, plugin payloads, or macro JSON
+- delete buttons
+- create categories
+
+Changes are saved directly to:
+
+```text
+~/.config/tvm/config.py
+```
+
+---
+
+## Macro Recorder
+
+Use the **Macro Recorder** button in the main window.
+
+Workflow:
+1. Click **Start**
+2. Run the TVM buttons you want to capture
+3. Click **Stop**
+4. Click **Save as Button**
+5. Choose a category and button label
+
+TVM saves the result as a built-in `macro` command.
+
+Example macro entry in config:
+
+```python
+Categories = {
+    "Macros": {
+        "My Macro": [
+            "macro",
+            [
+                [2, "pwd"],
+                [2, "ls -lah"],
+                ["plugin", {"plugin": "hello", "message": "done"}],
+            ],
+        ]
+    }
+}
+```
+
+Notes:
+- selecting a window is not recorded as part of a macro
+- nested macros are allowed, but keep them simple to avoid loops
+- recorded plugin actions preserve their plugin payload
+
+---
+
+## Plugin System
+
+Plugins live in:
 
 ```text
 ~/.config/tvm/plugins/
@@ -97,23 +169,7 @@ def run(app, context):
     ...
 ```
 
----
-
-## 🔄 Plugin Hot Reload
-
-TVM automatically reloads plugins when they change.
-
-You can:
-
-* Edit a plugin file
-* Save it
-* Click the button again → changes apply instantly
-
-You can also manually reload plugins using the **"Reload Plugins"** button in the UI.
-
----
-
-## 🧩 Plugin Example
+### Plugin example
 
 Create a plugin:
 
@@ -125,7 +181,6 @@ nano ~/.config/tvm/plugins/hello.py
 ```python
 def run(app, context):
     message = context.get("args", {}).get("message", "Hello from TVM!")
-
     window_id = context.get("window_id")
 
     if window_id:
@@ -134,7 +189,7 @@ def run(app, context):
     print(message)
 ```
 
-Add a button in your config:
+Add a button in config:
 
 ```python
 {
@@ -157,9 +212,20 @@ Example with arguments:
 }
 ```
 
+### Hot reload
+
+TVM reloads plugins automatically when they change.
+
+You can:
+- edit a plugin file
+- save it
+- click the plugin button again
+
+You can also click **Reload Plugins** in the main window.
+
 ---
 
-## 🖥️ Desktop Integration
+## Desktop Integration
 
 Create a launcher:
 
@@ -187,9 +253,15 @@ Make executable:
 chmod +x ~/.local/share/applications/tvm.desktop
 ```
 
+If it does not appear in the launcher right away:
+
+```bash
+update-desktop-database ~/.local/share/applications
+```
+
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 tvm/
@@ -198,78 +270,41 @@ tvm/
 │   ├── cli.py
 │   ├── xdo_helper.py
 │   └── default_config.py
-│
 ├── examples/
 │   └── config.py
-│
 ├── README.md
 └── pyproject.toml
 ```
 
 ---
 
-## 🧠 How It Works
+## How It Works
 
 TVM uses external X11 tools for stability:
 
-1. `xwininfo` — select window
-2. `xdotool` — send commands
-3. subprocess isolation — prevents crashes
+1. `xwininfo` selects a target window
+2. `xdotool` sends text and keys
+3. helper subprocess isolation prevents UI crashes from taking down Tkinter
 
 ---
 
-## 🐞 Troubleshooting
+## Troubleshooting
 
 ### Nothing happens
+- reselect the target window
+- make sure the terminal is still open
+- make sure you are on Xorg, not Wayland
 
-* Reselect the window
-* Ensure terminal is focused
+### Plugin not updating
+- save the plugin file and click the button again
+- or click **Reload Plugins**
 
-### Not launching from menu
-
-```bash
-update-desktop-database ~/.local/share/applications
-```
-
-### Wayland
-
-TVM currently requires Xorg.
+### Macro saved but not visible
+- reopen the category window after saving
+- the main window refreshes immediately, but already-open category windows do not
 
 ---
 
-## 📌 Categories
-
-```text
-Development Status :: 3 - Alpha
-Environment :: X11 Applications
-Intended Audience :: Developers
-License :: OSI Approved :: MIT License
-Operating System :: POSIX :: Linux
-Programming Language :: Python :: 3
-Topic :: Utilities
-Topic :: System :: Shells
-Topic :: Desktop Environment
-```
-
----
-
-## 📄 License
+## License
 
 MIT License
-
----
-
-## 🙌 Contributing
-
-PRs welcome.
-
----
-
-## 🔮 Roadmap
-
-* [ ] Wayland support
-* [ ] Macro recording
-* [ ] Plugin marketplace
-* [ ] Profiles/workspaces
-* [ ] Visual window picker
-

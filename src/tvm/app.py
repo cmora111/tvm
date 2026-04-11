@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import logging
@@ -7,8 +8,26 @@ import re
 import subprocess
 import sys
 import traceback
+from copy import deepcopy
 from pathlib import Path
-from tkinter import Button, Entry, Frame, Label, StringVar, Tk, Toplevel, messagebox
+from tkinter import (
+    BOTH,
+    END,
+    LEFT,
+    RIGHT,
+    Button,
+    Entry,
+    Frame,
+    Label,
+    Listbox,
+    Scrollbar,
+    StringVar,
+    Text,
+    Tk,
+    Toplevel,
+    messagebox,
+    simpledialog,
+)
 
 APP_NAME = "TVM"
 CONFIG_DIR = Path.home() / ".config" / "tvm"
@@ -16,6 +35,15 @@ CONFIG_FILE = CONFIG_DIR / "config.py"
 PLUGIN_DIR = CONFIG_DIR / "plugins"
 LOG_FILE = CONFIG_DIR / "tvm.log"
 HELPER_TIMEOUT_SECONDS = 15
+COMMAND_TYPE_LABELS = {
+    0: "select_window",
+    1: "spawn_terminal",
+    2: "send_to_window",
+    3: "run_detached",
+    "plugin": "plugin",
+    "macro": "macro",
+}
+COMMAND_TYPE_VALUES = {value: key for key, value in COMMAND_TYPE_LABELS.items()}
 
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
@@ -55,6 +83,10 @@ class TVMApp:
         self.window_id: int | str | None = None
         self.plugins: dict[str, object] = {}
         self.plugin_mtimes: dict[str, float] = {}
+        self.recording_macro = False
+        self.recorded_steps: list[list[object]] = []
+        self.macro_status_var = StringVar(value="Macro recorder: idle")
+        self.main_frame: Frame | None = None
         self.load_plugins(force=True)
 
         if self.debug:
@@ -119,30 +151,19 @@ class TVMApp:
         self.plugin_mtimes = mtimes
         return self.plugins
 
-    def reload_plugins(self) -> None:
-        before = set(self.plugins)
-        self.load_plugins(force=False)
-        after = set(self.plugins)
-        loaded = sorted(after - before)
-        reloaded = sorted(name for name in after & before if self.plugin_mtimes.get(name))
-        parts: list[str] = []
-        if loaded:
-            parts.append(f"new: {', '.join(loaded)}")
-        if reloaded:
-            parts.append(f"available: {', '.join(reloaded)}")
-        if not parts:
-            parts.append("No plugins found.")
-        self.log("Plugin refresh complete")
-
     def build_main(self) -> None:
+        if self.main_frame is not None and self.main_frame.winfo_exists():
+            self.main_frame.destroy()
+
         frame = Frame(self.root, padx=8, pady=8)
-        frame.pack()
+        frame.pack(fill=BOTH, expand=True)
+        self.main_frame = frame
 
         Label(
             frame,
             text="GUI CMDs",
             bd=4,
-            width=20,
+            width=24,
             bg="lightgreen",
             fg="black",
             relief="raised",
@@ -152,7 +173,7 @@ class TVMApp:
             Button(
                 frame,
                 text=category,
-                width=20,
+                width=24,
                 bg="black",
                 fg="yellow",
                 command=lambda c=category: self.open_category(c),
@@ -161,7 +182,7 @@ class TVMApp:
         Button(
             frame,
             text="Reload Plugins",
-            width=20,
+            width=24,
             bg="navy",
             fg="white",
             command=self.reload_plugins_with_notice,
@@ -169,12 +190,35 @@ class TVMApp:
 
         Button(
             frame,
+            text="Edit Buttons",
+            width=24,
+            bg="darkgreen",
+            fg="white",
+            command=self.open_button_editor,
+        ).pack(pady=2)
+
+        Button(
+            frame,
+            text="Macro Recorder",
+            width=24,
+            bg="purple",
+            fg="white",
+            command=self.open_macro_recorder,
+        ).pack(pady=2)
+
+        Label(frame, textvariable=self.macro_status_var, fg="blue").pack(pady=(6, 2))
+
+        Button(
+            frame,
             text="Exit",
-            width=20,
+            width=24,
             bg="red",
             fg="black",
             command=self.on_close,
         ).pack(side="bottom", pady=(10, 0))
+
+    def refresh_ui(self) -> None:
+        self.build_main()
 
     def open_category(self, category: str) -> None:
         win = Toplevel(self.root)
@@ -185,7 +229,7 @@ class TVMApp:
             win,
             text=category,
             bd=4,
-            width=20,
+            width=24,
             bg="lightgreen",
             fg="black",
             relief="raised",
@@ -195,7 +239,7 @@ class TVMApp:
             Button(
                 win,
                 text=subcategory,
-                width=20,
+                width=24,
                 bg="black",
                 fg="yellow",
                 command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s),
@@ -204,7 +248,7 @@ class TVMApp:
         Button(
             win,
             text="Exit",
-            width=20,
+            width=24,
             bg="red",
             fg="black",
             command=win.destroy,
@@ -212,12 +256,12 @@ class TVMApp:
 
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
         cmd_type, cmd = self.cfg.Categories[category][subcategory]
-        if isinstance(cmd, str) and "" in cmd:
+        if isinstance(cmd, str) and "{}" in cmd:
             self.prompt_window(cmd_type, cmd)
         else:
             self.run_cmd(cmd_type, cmd, parent_window)
 
-    def prompt_window(self, cmd_type: int, cmd: str) -> None:
+    def prompt_window(self, cmd_type: int | str, cmd: str) -> None:
         prompt = Toplevel(self.root)
         prompt.title("Input")
         prompt.protocol("WM_DELETE_WINDOW", prompt.destroy)
@@ -231,7 +275,7 @@ class TVMApp:
 
         def submit() -> None:
             value = name_var.get().strip()
-            new_cmd = re.sub(r"", value, cmd)
+            new_cmd = cmd.replace("{}", value)
             prompt.destroy()
             self.run_cmd(cmd_type, new_cmd, None)
 
@@ -301,10 +345,29 @@ class TVMApp:
         self.window_id = selected
         self.log(f"Selected window: {self.window_id}")
 
+    def normalize_command_type(self, cmd_type) -> int | str:
+        if cmd_type in COMMAND_TYPE_LABELS:
+            return cmd_type
+        if isinstance(cmd_type, str) and cmd_type in COMMAND_TYPE_VALUES:
+            return COMMAND_TYPE_VALUES[cmd_type]
+        return cmd_type
+
+    def record_step_if_needed(self, cmd_type, cmd) -> None:
+        if not self.recording_macro:
+            return
+        normalized = self.normalize_command_type(cmd_type)
+        if normalized in (0, "macro"):
+            return
+        self.recorded_steps.append([normalized, deepcopy(cmd)])
+        self.macro_status_var.set(f"Macro recorder: recording {len(self.recorded_steps)} step(s)")
+
     def run_cmd(self, cmd_type, cmd, current_window=None) -> None:
+        cmd_type = self.normalize_command_type(cmd_type)
         try:
             if current_window is not None and current_window.winfo_exists():
                 current_window.destroy()
+
+            self.record_step_if_needed(cmd_type, cmd)
 
             if cmd_type == 0:
                 self.select_target_window()
@@ -316,10 +379,22 @@ class TVMApp:
                 self.run_detached(str(cmd))
             elif cmd_type == "plugin":
                 self.run_plugin(cmd)
+            elif cmd_type == "macro":
+                self.run_macro(cmd)
             else:
                 raise TVMError(f"Unknown command type: {cmd_type}")
         except Exception as exc:
             self.show_error("Command failed", f"{exc}\n\n{traceback.format_exc()}")
+
+    def run_macro(self, cmd) -> None:
+        if not isinstance(cmd, list):
+            raise TVMError("Macro command must be a list of steps.")
+        for index, step in enumerate(cmd, start=1):
+            if not isinstance(step, (list, tuple)) or len(step) != 2:
+                raise TVMError(f"Macro step {index} is invalid: {step!r}")
+            step_type, step_cmd = step
+            self.log(f"Running macro step {index}: type={step_type} cmd={step_cmd!r}")
+            self.run_cmd(step_type, step_cmd, None)
 
     def run_plugin(self, cmd) -> None:
         self.load_plugins(force=False)
@@ -387,18 +462,19 @@ class TVMApp:
         self.log(f"Running detached command: {cmd}")
         subprocess.Popen(cmd, shell=True)
 
-    def send_to_selected_window(self, cmd: str) -> None:
+    def send_text_to_window(self, text: str, press_enter: bool = True) -> None:
         if not self.window_id:
             raise TVMError("No target window selected.")
 
-        self.log(f"Sending command to window {self.window_id}: {cmd}")
+        self.log(f"Sending text to window {self.window_id}: {text}")
+        key = "Return" if press_enter else ""
         try:
             self._run_helper(
                 {
                     "action": "send",
                     "window_id": self.window_id,
-                    "text": cmd,
-                    "key": "Return",
+                    "text": text,
+                    "key": key,
                     "focus_delay_ms": 100,
                     "text_delay_us": 1200,
                     "key_delay_us": 1200,
@@ -412,9 +488,253 @@ class TVMApp:
                 "The target may have closed or the X11 helper failed. Re-select the window and try again."
             ) from exc
 
+    def send_to_selected_window(self, cmd: str) -> None:
+        self.send_text_to_window(cmd, press_enter=True)
+
+    def open_macro_recorder(self) -> None:
+        win = Toplevel(self.root)
+        win.title("Macro Recorder")
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+
+        Label(win, text="Record TVM button actions and save them as a macro button.").pack(
+            padx=10, pady=(10, 6)
+        )
+        Label(win, textvariable=self.macro_status_var, fg="blue").pack(padx=10, pady=(0, 8))
+
+        steps_text = Text(win, width=80, height=14)
+        steps_text.pack(padx=10, pady=6)
+
+        def refresh_steps() -> None:
+            steps_text.delete("1.0", END)
+            if self.recorded_steps:
+                steps_text.insert("1.0", json.dumps(self.recorded_steps, indent=2))
+            else:
+                steps_text.insert("1.0", "[]")
+
+        def start_recording() -> None:
+            self.recorded_steps = []
+            self.recording_macro = True
+            self.macro_status_var.set("Macro recorder: recording 0 step(s)")
+            refresh_steps()
+
+        def stop_recording() -> None:
+            self.recording_macro = False
+            self.macro_status_var.set(f"Macro recorder: captured {len(self.recorded_steps)} step(s)")
+            refresh_steps()
+
+        def save_macro() -> None:
+            if not self.recorded_steps:
+                raise TVMError("No steps have been recorded yet.")
+            category = simpledialog.askstring("Save Macro", "Category name:", parent=win)
+            if not category:
+                return
+            label = simpledialog.askstring("Save Macro", "Button label:", parent=win)
+            if not label:
+                return
+            self.cfg.Categories.setdefault(category, {})[label] = ["macro", deepcopy(self.recorded_steps)]
+            self.save_config()
+            self.refresh_ui()
+            messagebox.showinfo("Macro Recorder", f"Saved macro '{label}' in category '{category}'.")
+
+        controls = Frame(win)
+        controls.pack(pady=(0, 10))
+        Button(controls, text="Start", bg="darkgreen", fg="white", command=start_recording).pack(
+            side=LEFT, padx=4
+        )
+        Button(controls, text="Stop", bg="orange", fg="black", command=stop_recording).pack(
+            side=LEFT, padx=4
+        )
+        Button(controls, text="Save as Button", bg="navy", fg="white", command=save_macro).pack(
+            side=LEFT, padx=4
+        )
+        Button(controls, text="Refresh View", command=refresh_steps).pack(side=LEFT, padx=4)
+
+        refresh_steps()
+
+    def open_button_editor(self) -> None:
+        win = Toplevel(self.root)
+        win.title("Button Editor")
+        win.geometry("980x520")
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+
+        left = Frame(win)
+        left.pack(side=LEFT, fill=BOTH, expand=False, padx=(8, 4), pady=8)
+        right = Frame(win)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(4, 8), pady=8)
+
+        Label(left, text="Buttons", bg="lightgreen", width=28).pack(pady=(0, 6))
+        listbox = Listbox(left, width=40, height=24)
+        listbox.pack(side=LEFT, fill=BOTH, expand=True)
+        scroll = Scrollbar(left, orient="vertical", command=listbox.yview)
+        scroll.pack(side=RIGHT, fill="y")
+        listbox.config(yscrollcommand=scroll.set)
+
+        form = Frame(right)
+        form.pack(fill=BOTH, expand=True)
+
+        category_var = StringVar()
+        label_var = StringVar()
+        type_var = StringVar(value="send_to_window")
+
+        Label(form, text="Category").grid(row=0, column=0, sticky="w")
+        category_entry = Entry(form, textvariable=category_var, width=32)
+        category_entry.grid(row=0, column=1, sticky="ew", padx=(4, 8), pady=2)
+
+        Label(form, text="Button Label").grid(row=1, column=0, sticky="w")
+        label_entry = Entry(form, textvariable=label_var, width=32)
+        label_entry.grid(row=1, column=1, sticky="ew", padx=(4, 8), pady=2)
+
+        Label(form, text="Command Type").grid(row=2, column=0, sticky="w")
+        type_entry = Entry(form, textvariable=type_var, width=32)
+        type_entry.grid(row=2, column=1, sticky="ew", padx=(4, 8), pady=2)
+        Label(
+            form,
+            text="Use: select_window, spawn_terminal, send_to_window, run_detached, plugin, macro",
+            fg="gray40",
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(0, 8))
+
+        Label(form, text="Command / JSON Payload").grid(row=4, column=0, sticky="nw")
+        cmd_text = Text(form, width=64, height=18)
+        cmd_text.grid(row=4, column=1, sticky="nsew", padx=(4, 8), pady=2)
+        form.grid_columnconfigure(1, weight=1)
+        form.grid_rowconfigure(4, weight=1)
+
+        index_map: list[tuple[str, str]] = []
+        selected_key: dict[str, tuple[str, str] | None] = {"value": None}
+
+        def render_cmd_value(value) -> str:
+            if isinstance(value, str):
+                return value
+            return json.dumps(value, indent=2)
+
+        def parse_cmd_value(raw: str):
+            raw = raw.strip()
+            if not raw:
+                return ""
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                try:
+                    return ast.literal_eval(raw)
+                except Exception:
+                    return raw
+
+        def refresh_list() -> None:
+            listbox.delete(0, END)
+            index_map.clear()
+            for category_name, buttons in self.cfg.Categories.items():
+                for button_name in buttons:
+                    index_map.append((category_name, button_name))
+                    listbox.insert(END, f"{category_name} / {button_name}")
+
+        def load_selected(_event=None) -> None:
+            selection = listbox.curselection()
+            if not selection:
+                return
+            category_name, button_name = index_map[selection[0]]
+            selected_key["value"] = (category_name, button_name)
+            cmd_type, cmd = self.cfg.Categories[category_name][button_name]
+            category_var.set(category_name)
+            label_var.set(button_name)
+            type_var.set(COMMAND_TYPE_LABELS.get(cmd_type, str(cmd_type)))
+            cmd_text.delete("1.0", END)
+            cmd_text.insert("1.0", render_cmd_value(cmd))
+
+        def clear_form() -> None:
+            selected_key["value"] = None
+            category_var.set("")
+            label_var.set("")
+            type_var.set("send_to_window")
+            cmd_text.delete("1.0", END)
+
+        def save_entry() -> None:
+            category_name = category_var.get().strip()
+            button_name = label_var.get().strip()
+            if not category_name or not button_name:
+                raise TVMError("Category and button label are required.")
+
+            raw_type = type_var.get().strip()
+            cmd_type = COMMAND_TYPE_VALUES.get(raw_type, raw_type)
+            if cmd_type not in COMMAND_TYPE_LABELS:
+                raise TVMError(f"Unsupported command type: {raw_type}")
+
+            cmd_value = parse_cmd_value(cmd_text.get("1.0", END))
+            old_key = selected_key["value"]
+            if old_key and old_key != (category_name, button_name):
+                old_category, old_button = old_key
+                if old_category in self.cfg.Categories:
+                    self.cfg.Categories[old_category].pop(old_button, None)
+                    if not self.cfg.Categories[old_category]:
+                        self.cfg.Categories.pop(old_category, None)
+
+            self.cfg.Categories.setdefault(category_name, {})[button_name] = [cmd_type, cmd_value]
+            self.save_config()
+            self.refresh_ui()
+            refresh_list()
+            selected_key["value"] = (category_name, button_name)
+            messagebox.showinfo("Button Editor", "Button saved.")
+
+        def delete_entry() -> None:
+            key = selected_key["value"]
+            if not key:
+                raise TVMError("Select a button to delete.")
+            category_name, button_name = key
+            if not messagebox.askyesno("Delete Button", f"Delete '{button_name}' from '{category_name}'?"):
+                return
+            self.cfg.Categories.get(category_name, {}).pop(button_name, None)
+            if category_name in self.cfg.Categories and not self.cfg.Categories[category_name]:
+                self.cfg.Categories.pop(category_name, None)
+            self.save_config()
+            self.refresh_ui()
+            refresh_list()
+            clear_form()
+
+        def add_category() -> None:
+            name = simpledialog.askstring("New Category", "Category name:", parent=win)
+            if not name:
+                return
+            self.cfg.Categories.setdefault(name.strip(), {})
+            self.save_config()
+            self.refresh_ui()
+            refresh_list()
+
+        buttons = Frame(right)
+        buttons.pack(fill="x", pady=(8, 0))
+        Button(buttons, text="New", command=clear_form, bg="gray20", fg="white").pack(side=LEFT, padx=4)
+        Button(buttons, text="Save", command=lambda: self._guarded_editor_action(save_entry), bg="darkgreen", fg="white").pack(side=LEFT, padx=4)
+        Button(buttons, text="Delete", command=lambda: self._guarded_editor_action(delete_entry), bg="darkred", fg="white").pack(side=LEFT, padx=4)
+        Button(buttons, text="Add Category", command=add_category, bg="navy", fg="white").pack(side=LEFT, padx=4)
+        Button(buttons, text="Close", command=win.destroy).pack(side=LEFT, padx=4)
+
+        listbox.bind("<<ListboxSelect>>", load_selected)
+        refresh_list()
+
+    def _guarded_editor_action(self, func) -> None:
+        try:
+            func()
+        except Exception as exc:
+            self.show_error("Editor Error", f"{exc}\n\n{traceback.format_exc()}")
+
+    def save_config(self) -> None:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        text = (
+            "debug = "
+            + repr(getattr(self.cfg, "debug", {}))
+            + "\n\n"
+            + "terminal = "
+            + repr(getattr(self.cfg, "terminal", {}))
+            + "\n\n"
+            + "Categories = "
+            + repr(self.cfg.Categories)
+            + "\n"
+        )
+        CONFIG_FILE.write_text(text, encoding="utf-8")
+        self.log(f"Saved config to {CONFIG_FILE}")
+
     @staticmethod
     def show_error(title: str, message: str) -> None:
         messagebox.showerror(title, message)
+
 
 
 def ensure_user_config() -> None:
@@ -437,6 +757,7 @@ def ensure_user_config() -> None:
         + "\n",
         encoding="utf-8",
     )
+
 
 
 def main() -> int:
