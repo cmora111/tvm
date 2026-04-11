@@ -1,10 +1,10 @@
 Requirements:
 
 ```
-python3-tk
-git://github.com/rshk/python-libxdo
 ```
 # TVM
+
+https://github.com/cmora111/tvm
 
 TVM is a small Tkinter-based virtual macropad for Linux/X11. It lets you click a target window and send configured commands to it.
 
@@ -29,6 +29,12 @@ python3 -m pip install xdo
 or
 
 python3 -m pip install python-libxdo-ng
+
+or
+
+git://github.com/rshk/python-libxdo
+
+or
 
 You may also need your distro's libxdo package.
 
