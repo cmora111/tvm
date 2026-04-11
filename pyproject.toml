@@ -23,8 +23,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/tvm"
-Issues = "https://github.com/YOUR_USERNAME/tvm/issues"
+Homepage = "https://github.com/cmora111/tvm"
+Issues = "https://github.com/cmora111/tvm/issues"
 
 [project.gui-scripts]
 tvm = "tvm.cli:main"
