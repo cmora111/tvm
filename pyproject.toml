@@ -1,0 +1,36 @@
+
+[build-system]
+requires = ["setuptools>=77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tvm-macropad"
+version = "0.1.0"
+description = "Tkinter virtual macropad for sending commands to a selected X11 window"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Carlos Mora" }
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Environment :: X11 Applications",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Desktop Environment",
+  "Topic :: Utilities"
+]
+
+[project.urls]
+Homepage = "https://github.com/YOUR_USERNAME/tvm"
+Issues = "https://github.com/YOUR_USERNAME/tvm/issues"
+
+[project.gui-scripts]
+tvm = "tvm.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
