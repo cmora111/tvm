@@ -10,8 +10,9 @@ TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a s
 * Click-to-select target window
 * Command execution via `xdotool`
 * Configurable button grid
-* Plugin system (extensible actions)
-* Desktop launcher support
+* 🧩 Plugin system (extensible actions)
+* 🔄 Plugin hot-reload (no restart required)
+* 🖥️ Desktop launcher support
 * Works on Ubuntu / Xorg
 
 ---
@@ -83,7 +84,7 @@ cp examples/config.py ~/.config/tvm/config.py
 
 Plugins allow you to extend TVM with custom actions.
 
-### Plugin Directory
+### 📁 Plugin Directory
 
 ```text
 ~/.config/tvm/plugins/
@@ -95,6 +96,20 @@ Each plugin must define:
 def run(app, context):
     ...
 ```
+
+---
+
+## 🔄 Plugin Hot Reload
+
+TVM automatically reloads plugins when they change.
+
+You can:
+
+* Edit a plugin file
+* Save it
+* Click the button again → changes apply instantly
+
+You can also manually reload plugins using the **"Reload Plugins"** button in the UI.
 
 ---
 
@@ -199,7 +214,7 @@ TVM uses external X11 tools for stability:
 
 1. `xwininfo` — select window
 2. `xdotool` — send commands
-3. Subprocess isolation — prevents crashes
+3. subprocess isolation — prevents crashes
 
 ---
 
@@ -218,7 +233,7 @@ update-desktop-database ~/.local/share/applications
 
 ### Wayland
 
-TVM requires Xorg
+TVM currently requires Xorg.
 
 ---
 
