@@ -1,29 +1,211 @@
-# TVM
+# TVM — Terminal Virtual Macropad
 
-TVM is a small Tkinter-based virtual macropad for Linux/X11. It lets you click a target window and send configured commands to it.
+TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a selected terminal window.
 
-Repository: `https://github.com/cmora111/tvm`
+It allows you to:
 
-## Features
+* Select any X11 window
+* Send predefined commands
+* Run scripts/macros quickly
+* Extend behavior via plugins
 
-- Button-driven command launcher
-- Per-user config at `~/.config/tvm/config.py`
-- X11 window selection through `xdo`
-- Terminal launch and detached app launch
-- Isolated `xdo` helper subprocess to reduce whole-app crashes from native libxdo failures
-- Debug logging to `~/.config/tvm/tvm.log`
+---
 
-## Platform support
+## 🚀 Features
 
-TVM is currently aimed at:
+* GUI-based macropad
+* Click-to-select target window
+* Command execution via `xdotool`
+* Configurable button grid
+* Plugin system (extensible actions)
+* Works on Ubuntu / Xorg
 
-- Ubuntu/Linux
-- Xorg / X11 sessions
-- Python 3.10+
+---
 
-Wayland is not a supported target at this time.
+## ⚠️ Requirements
 
-## Categories
+* Linux (Xorg session)
+* Python 3.10+
+* External tools:
+
+  * `xdotool`
+  * `x11-utils`
+
+Install dependencies:
+
+```bash
+sudo apt install xdotool x11-utils
+```
+
+---
+
+## 📦 Installation (Recommended)
+
+Using pipx:
+
+```bash
+sudo apt install pipx
+pipx ensurepath
+
+pipx install tvm
+```
+
+Run:
+
+```bash
+tvm
+```
+
+---
+
+## 🧪 Development Mode
+
+```bash
+git clone https://github.com/cmora111/tvm
+cd tvm
+
+pipx install -e .
+```
+
+Or without installing:
+
+```bash
+PYTHONPATH=src python3 -m tvm
+```
+
+---
+
+## ⚙️ Configuration
+
+TVM loads config from:
+
+```text
+~/.config/tvm/config.py
+```
+
+Create it from the example:
+
+```bash
+mkdir -p ~/.config/tvm
+cp examples/config.py ~/.config/tvm/config.py
+```
+
+---
+
+## 🧩 Plugin System
+
+TVM supports plugins for custom actions.
+
+### Plugin location:
+
+```text
+~/.config/tvm/plugins/
+```
+
+### Example plugin:
+
+```python
+# ~/.config/tvm/plugins/hello.py
+
+def run(app, context):
+    print("Hello from plugin!")
+```
+
+### Use in config:
+
+```python
+{
+    "label": "Hello",
+    "type": "plugin",
+    "plugin": "hello"
+}
+```
+
+---
+
+## 🖥️ Desktop Integration
+
+Create a launcher:
+
+```bash
+mkdir -p ~/.local/share/applications
+nano ~/.local/share/applications/tvm.desktop
+```
+
+Paste:
+
+```ini
+[Desktop Entry]
+Name=TVM
+Comment=Terminal Virtual Macropad
+Exec=tvm
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Utility;
+```
+
+Make executable:
+
+```bash
+chmod +x ~/.local/share/applications/tvm.desktop
+```
+
+Now TVM will appear in your app launcher.
+
+---
+
+## 📁 Project Structure
+
+```text
+tvm/
+├── src/tvm/
+│   ├── app.py
+│   ├── cli.py
+│   ├── xdo_helper.py
+│   └── default_config.py
+│
+├── examples/
+│   └── config.py
+│
+├── README.md
+└── pyproject.toml
+```
+
+---
+
+## 🧠 How It Works
+
+TVM does **not** directly control windows via Python bindings.
+
+Instead it:
+
+1. Uses `xwininfo` to select a window
+2. Uses `xdotool` to send input
+3. Runs these in a subprocess for stability
+
+This avoids crashes caused by native bindings.
+
+---
+
+## 🐞 Troubleshooting
+
+### Nothing happens when sending commands
+
+* Make sure the window still exists
+* Try reselecting it
+
+### TVM doesn’t launch from menu
+
+* Run `update-desktop-database`
+
+### Wayland issues
+
+TVM currently requires Xorg.
+
+---
+
+## 📌 Categories
 
 ```text
 Development Status :: 3 - Alpha
@@ -32,187 +214,30 @@ Intended Audience :: Developers
 License :: OSI Approved :: MIT License
 Operating System :: POSIX :: Linux
 Programming Language :: Python :: 3
-Topic :: Desktop Environment
-Topic :: System :: Shells
 Topic :: Utilities
+Topic :: System :: Shells
+Topic :: Desktop Environment
 ```
 
-## Why the stability patch exists
+---
 
-The original app called `Xdo()` directly from the Tkinter process for both window selection and command sending. If `python-libxdo` or the underlying native `libxdo` layer crashes, the whole GUI process can die. The updated design moves those calls into `tvm.xdo_helper`, a small helper subprocess.
+## 📄 License
 
-That means:
+MIT License
 
-- native `xdo` failures are easier to detect
-- timeouts are explicit
-- the Tkinter UI is more likely to stay alive
-- failed sends can clear the stale selected window and ask for reselection
+---
 
-## Install
+## 🙌 Contributing
 
-### Install from source
+PRs and ideas welcome.
 
-```bash
-python3 -m pip install .
-```
+---
 
-### Install X11/libxdo binding
+## 🔮 Roadmap
 
-TVM needs both:
+* [ ] Wayland support
+* [ ] Macro recording
+* [ ] Visual window selector overlay
+* [ ] Plugin marketplace
+* [ ] Profiles/workspaces
 
-1. a Python `xdo` binding
-2. the system `libxdo` package
-
-One common Ubuntu flow is:
-
-```bash
-sudo apt update
-sudo apt install -y libxdo-dev
-python3 -m pip install xdo
-```
-
-If that specific binding does not work on your system, other bindings may also work, but the package must still provide:
-
-- `from xdo import Xdo`
-- `select_window_with_click()`
-- `focus_window()`
-- `enter_text_window()`
-- `send_keysequence_window()`
-
-## Build and install a wheel
-
-```bash
-python3 -m pip install --upgrade build
-python3 -m build
-python3 -m pip install .
-```
-
-## Example configuration
-
-TVM uses a per-user config file at:
-
-```text
-~/.config/tvm/config.py
-```
-
-Example:
-
-```python
-debug = {"Flag": False}
-
-terminal = {
-    "application": "gnome-terminal"
-}
-
-Categories = {
-    "Select Window": {
-        "Select window": [0, "None"]
-    },
-    "Admin_CMDs": {
-        "ls": [2, "ls"],
-        "ps": [2, "ps axwwl"],
-        "pwd": [2, "pwd"],
-        "cd": [2, "cd "],
-    },
-    "APT_CMDs": {
-        "Update": [2, "sudo apt update"],
-        "Upgrade": [2, "sudo apt upgrade -y"],
-        "Install": [2, "sudo apt install "],
-        "Reinstall": [2, "sudo apt install -y --reinstall "],
-        "Purge": [2, "sudo apt purge -y "],
-        "Autoremove": [2, "sudo apt autoremove -y"],
-        "Fix-Broken": [2, "sudo apt --fix-broken install -y"]
-    },
-    "Applications": {
-        "htop": [1, "htop"],
-        "Firefox": [3, "firefox > /dev/null 2>&1 &"],
-        "Visual": [3, "code > /dev/null 2>&1 &"]
-    },
-    "Vi": {
-        "Write_Exit": [2, ":wq!\\r"],
-        "NoWrite_Exit": [2, ":q\\r"],
-        "Reload": [2, ":e!\\r"],
-        "Date_Stamp": [2, "!!date\\r"]
-    }
-}
-```
-
-## Command types
-
-TVM command entries use the form:
-
-```python
-[label] = [command_type, command_string]
-```
-
-Where `command_type` is:
-
-```text
-0 = select a target window
-1 = spawn a terminal and run the command there
-2 = send the command to the currently selected window
-3 = run detached in the background
-```
-
-## Debugging
-
-Set debug on in your config:
-
-```python
-debug = {"Flag": True}
-```
-
-Then inspect:
-
-```bash
-cat ~/.config/tvm/tvm.log
-```
-
-That log is useful for:
-
-- helper launch failures
-- empty helper responses
-- stale window problems
-- command send attempts
-
-## Stability notes
-
-The patched app now does the following when sending commands:
-
-- requires a selected target window
-- logs the target window ID and command
-- routes the native X11 work through a subprocess helper
-- clears the stored window ID if sending fails
-- asks the user to reselect the window after a failure
-
-## Packaging note
-
-The stability patch adds this new module to the package:
-
-```text
-src/tvm/xdo_helper.py
-```
-
-Be sure that file is included in the repo before building or publishing.
-
-## Screenshots
-
-### Main Screen
-
-![Example Main Screen](docs/main.png "Example Main Screen")
-
-### Main Screen and Admin Commands
-
-![Example Main Screen and Admin Commands](docs/main_and_Admin_CMDs.png "Example Main Screen and Admin Commands")
-
-### Main Screen and APT Commands
-
-![Example Main Screen and APT Commands](docs/main_and_APT_CMDs.png "Example Main Screen and APT Commands")
-
-### Main Screen and Applications
-
-![Example Main Screen and Applications](docs/main_and_Aplications.png "Example Main Screen and Applications")
-
-### Main Screen and Vi Commands
-
-![Example Main Screen and Vi Commands](docs/main_and_Vi_CMDs.png "Example Main Screen and Vi Commands")

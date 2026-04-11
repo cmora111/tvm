@@ -1,10 +1,21 @@
-
+# Python
 __pycache__/
 *.pyc
 *.pyo
-*.egg-info/
-build/
+
+# Build
 dist/
-.venv/
-post
-tvm_stable_package.zip
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# User config
+.config/
+
+# Archives
+*.zip
+
+#misc
+.venv
