@@ -7,3 +7,4 @@ build/
 dist/
 .venv/
 post
+tvm_stable_package.zip
