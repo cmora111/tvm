@@ -42,6 +42,7 @@ PLACEHOLDER_RE = re.compile(r"<([^<>]+)>")
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 PLUGIN_DIR.mkdir(parents=True, exist_ok=True)
 
+
 logging.basicConfig(
     filename=LOG_FILE,
     level=logging.INFO,
