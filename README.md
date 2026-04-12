@@ -2,21 +2,18 @@
 
 TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a selected terminal window.
 
----
-
 ## Features
 
 - GUI-based macropad
 - Click-to-select target window
 - Command execution via `xdotool`
-- Configurable button categories
-- Plugin system with hot reload
-- Visual button editor built into the app
-- Macro recorder built into the app
+- Configurable button grid
+- Plugin system
+- Plugin hot reload
+- Plugin Browser UI
+- Plugin API versioning
 - Desktop launcher support
 - Works on Ubuntu / Xorg
-
----
 
 ## Requirements
 
@@ -28,11 +25,9 @@ TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a s
 sudo apt install xdotool x11-utils
 ```
 
----
-
 ## Installation
 
-Recommended with pipx:
+Using pipx:
 
 ```bash
 sudo apt install pipx
@@ -46,7 +41,7 @@ Run:
 tvm
 ```
 
-Development install:
+## Development
 
 ```bash
 git clone https://github.com/cmora111/tvm
@@ -54,13 +49,11 @@ cd tvm
 pipx install -e .
 ```
 
-Run without installing:
+Or without installing:
 
 ```bash
 PYTHONPATH=src python3 -m tvm
 ```
-
----
 
 ## Configuration
 
@@ -70,93 +63,16 @@ TVM loads config from:
 ~/.config/tvm/config.py
 ```
 
-Create it from the example:
+Copy the example:
 
 ```bash
 mkdir -p ~/.config/tvm
 cp examples/config.py ~/.config/tvm/config.py
 ```
 
----
-
-## Command Types
-
-TVM supports these built-in command types:
-
-```text
-select_window
-spawn_terminal
-send_to_window
-run_detached
-plugin
-macro
-```
-
-The first four map to the original numeric command types automatically, so older configs continue to work.
-
----
-
-## Visual Button Editor
-
-Use the **Edit Buttons** button in the main window to open the built-in editor.
-
-You can:
-- create new buttons
-- rename buttons
-- move a button to a different category
-- change the command type
-- edit plain commands, plugin payloads, or macro JSON
-- delete buttons
-- create categories
-
-Changes are saved directly to:
-
-```text
-~/.config/tvm/config.py
-```
-
----
-
-## Macro Recorder
-
-Use the **Macro Recorder** button in the main window.
-
-Workflow:
-1. Click **Start**
-2. Run the TVM buttons you want to capture
-3. Click **Stop**
-4. Click **Save as Button**
-5. Choose a category and button label
-
-TVM saves the result as a built-in `macro` command.
-
-Example macro entry in config:
-
-```python
-Categories = {
-    "Macros": {
-        "My Macro": [
-            "macro",
-            [
-                [2, "pwd"],
-                [2, "ls -lah"],
-                ["plugin", {"plugin": "hello", "message": "done"}],
-            ],
-        ]
-    }
-}
-```
-
-Notes:
-- selecting a window is not recorded as part of a macro
-- nested macros are allowed, but keep them simple to avoid loops
-- recorded plugin actions preserve their plugin payload
-
----
-
 ## Plugin System
 
-Plugins live in:
+Plugin files live in:
 
 ```text
 ~/.config/tvm/plugins/
@@ -169,61 +85,78 @@ def run(app, context):
     ...
 ```
 
-### Plugin example
+### Plugin metadata
+
+Plugins may also define:
+
+```python
+PLUGIN_NAME = "Hello World"
+PLUGIN_VERSION = "1.0.0"
+PLUGIN_DESCRIPTION = "Example plugin"
+TVM_PLUGIN_API_VERSION = 1
+```
+
+### Plugin Example
 
 Create a plugin:
 
 ```bash
 mkdir -p ~/.config/tvm/plugins
-nano ~/.config/tvm/plugins/hello.py
+nano ~/.config/tvm/plugins/hello_world.py
 ```
 
 ```python
-def run(app, context):
-    message = context.get("args", {}).get("message", "Hello from TVM!")
-    window_id = context.get("window_id")
+PLUGIN_NAME = "Hello World"
+PLUGIN_VERSION = "1.0.0"
+PLUGIN_DESCRIPTION = "Example TVM plugin"
+TVM_PLUGIN_API_VERSION = 1
 
-    if window_id:
+def run(app, context):
+    args = context.get("args", {})
+    message = args.get("message", "Hello from TVM!")
+
+    if context.get("window_id"):
         app.send_text_to_window(f'echo "{message}"')
 
     print(message)
 ```
 
-Add a button in config:
+Add a button in your config:
 
 ```python
 {
-    "label": "Hello",
+    "label": "Hello World",
     "type": "plugin",
-    "plugin": "hello"
-}
-```
-
-Example with arguments:
-
-```python
-{
-    "label": "Custom Message",
-    "type": "plugin",
-    "plugin": "hello",
-    "args": {
-        "message": "This came from config!"
+    "plugin": {
+        "plugin": "hello_world",
+        "args": {
+            "message": "This came from config!"
+        }
     }
 }
 ```
 
-### Hot reload
+## Plugin Browser
 
-TVM reloads plugins automatically when they change.
+TVM includes a built-in **Plugin Browser** window.
 
-You can:
-- edit a plugin file
-- save it
-- click the plugin button again
+It shows:
+
+- plugin name
+- plugin version
+- plugin API version
+- compatibility with the current TVM build
+- file path
+- last modified time
+- load errors
+
+Use it to verify that plugins loaded correctly and to spot API mismatches quickly.
+
+## Plugin Hot Reload
+
+TVM automatically reloads plugin files when they change.
 
 You can also click **Reload Plugins** in the main window.
-
----
 
 ## Desktop Integration
 
@@ -253,14 +186,6 @@ Make executable:
 chmod +x ~/.local/share/applications/tvm.desktop
 ```
 
-If it does not appear in the launcher right away:
-
-```bash
-update-desktop-database ~/.local/share/applications
-```
-
----
-
 ## Project Structure
 
 ```text
@@ -271,39 +196,36 @@ tvm/
 │   ├── xdo_helper.py
 │   └── default_config.py
 ├── examples/
-│   └── config.py
+│   ├── config.py
+│   └── plugins/
+│       └── hello_world.py
 ├── README.md
+├── PLUGIN_API.md
 └── pyproject.toml
 ```
-
----
 
 ## How It Works
 
 TVM uses external X11 tools for stability:
 
-1. `xwininfo` selects a target window
-2. `xdotool` sends text and keys
-3. helper subprocess isolation prevents UI crashes from taking down Tkinter
-
----
+1. `xwininfo` — select window
+2. `xdotool` — send commands
+3. subprocess isolation — prevents crashes in the GUI process
 
 ## Troubleshooting
 
 ### Nothing happens
-- reselect the target window
-- make sure the terminal is still open
-- make sure you are on Xorg, not Wayland
+- Reselect the window
+- Ensure the terminal still exists
 
-### Plugin not updating
-- save the plugin file and click the button again
-- or click **Reload Plugins**
+### Not launching from menu
 
-### Macro saved but not visible
-- reopen the category window after saving
-- the main window refreshes immediately, but already-open category windows do not
+```bash
+update-desktop-database ~/.local/share/applications
+```
 
----
+### Wayland
+TVM currently requires Xorg.
 
 ## License
 
