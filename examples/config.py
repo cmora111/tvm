@@ -43,3 +43,9 @@ Categories = {
         'Hello World Plugin': ['plugin', 'hello_world'],
     },
 }
+Favorites = [
+    ["Admin_CMDs", "ls"],
+    ["Admin_CMDs", "pwd"],
+    ["Admin_CMDs", "ssh"],
+    ["Plugins", "Hello World Plugin"],
+]
