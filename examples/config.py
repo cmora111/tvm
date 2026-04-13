@@ -1,67 +1,45 @@
-📄 examples/config.py
-# TVM Configuration File
-# Copy this to: ~/.config/tvm/config.py
+# TVM example configuration
+# Copy to: ~/.config/tvm/config.py
 
-CONFIG = {
-    "grid": {
-        "rows": 3,
-        "cols": 3
+debug = {
+    'Flag': False
+}
+
+terminal = {
+    'application': 'gnome-terminal'
+}
+
+# Command entry formats:
+#   [0, 'None']                         -> select target window
+#   [1, 'command']                      -> open new terminal and run command
+#   [2, 'command']                      -> send command to selected window
+#   [3, 'command']                      -> run detached command
+#   ['plugin', 'plugin_name']           -> run plugin by name
+#   [2, 'dangerous command', {'confirm': True}] -> ask for confirmation first
+#
+# Placeholders like <name>, <user>, <host>, <path> will prompt for input.
+
+Categories = {
+    'Select Window': {
+        'Select window': [0, 'None'],
     },
 
-    "buttons": [
-        # --- Basic Commands ---
-        {
-            "label": "List Files",
-            "type": "command",
-            "command": "ls -lah"
-        },
-        {
-            "label": "Git Status",
-            "type": "command",
-            "command": "git status"
-        },
-        {
-            "label": "Clear",
-            "type": "command",
-            "command": "clear"
-        },
+    'Admin_CMDs': {
+        'ls': [2, 'ls'],
+        'ps': [2, 'ps axwwl'],
+        'pwd': [2, 'pwd'],
+        'cd': [2, 'cd <path>'],
+        'mkdir': [2, 'mkdir -p <path>'],
+        'ssh': [2, 'ssh <user>@<host>'],
+        'Danger Upgrade': [2, 'sudo apt upgrade -y', {'confirm': True}],
+    },
 
-        # --- Script / Multi-command ---
-        {
-            "label": "Update System",
-            "type": "command",
-            "command": "sudo apt update && sudo apt upgrade -y"
-        },
+    'Applications': {
+        'htop': [1, 'htop'],
+        'Visual Studio Code': [3, 'code > /dev/null 2>&1 &'],
+    },
 
-        # --- Plugin Example (simple) ---
-        {
-            "label": "Hello Plugin",
-            "type": "plugin",
-            "plugin": "hello"
-        },
-
-        # --- Plugin Example with args ---
-        {
-            "label": "Custom Message",
-            "type": "plugin",
-            "plugin": "hello",
-            "args": {
-                "message": "Hello from TVM plugin!"
-            }
-        },
-
-        # --- Empty slots (optional) ---
-        {
-            "label": "",
-            "type": "noop"
-        },
-        {
-            "label": "",
-            "type": "noop"
-        },
-        {
-            "label": "",
-            "type": "noop"
-        },
-    ]
+    'Plugins': {
+        'Hello World Plugin': ['plugin', 'hello_world'],
+    },
 }

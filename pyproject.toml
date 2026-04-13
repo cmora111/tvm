@@ -1,36 +1,42 @@
-
 [build-system]
-requires = ["setuptools>=77.0.3", "wheel"]
+requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tvm-macropad"
-version = "0.1.0"
-description = "Tkinter virtual macropad for sending commands to a selected X11 window"
+name = "tvm"
+version = "0.2.4"
+description = "Terminal Virtual Macropad for Xorg terminals"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
   { name = "Carlos Mora" }
 ]
+keywords = ["tkinter", "x11", "xdotool", "terminal", "macropad", "ubuntu"]
 classifiers = [
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: MIT License",
+  "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
   "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Utilities",
+  "Topic :: System :: Shells",
   "Topic :: Desktop Environment",
-  "Topic :: Utilities"
 ]
 
 [project.urls]
 Homepage = "https://github.com/cmora111/tvm"
 Issues = "https://github.com/cmora111/tvm/issues"
 
-[project.gui-scripts]
+[project.scripts]
 tvm = "tvm.cli:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+tvm = []
