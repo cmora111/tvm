@@ -14,6 +14,7 @@ from tkinter import (
     END,
     LEFT,
     RIGHT,
+    X,
     Y,
     Button,
     Entry,
@@ -29,7 +30,7 @@ from tkinter import (
 )
 
 APP_NAME = "TVM"
-APP_VERSION = "0.2.5"
+APP_VERSION = "0.2.6"
 PLUGIN_API_VERSION = 1
 
 CONFIG_DIR = Path.home() / ".config" / "tvm"
@@ -107,28 +108,20 @@ class MultiFieldPrompt:
         container = Frame(self.window, padx=10, pady=10)
         container.pack(fill=BOTH, expand=True)
 
-        Label(
-            container,
-            text="Enter command values",
-            bd=2,
-            relief="groove",
-            width=28,
-            bg="lightgreen",
-            fg="black",
-        ).pack(pady=(0, 10))
+        Label(container, text="Enter command values", bd=2, relief="groove", width=28, bg="lightgreen", fg="black").pack(pady=(0, 10))
 
         self.entries: dict[str, Entry] = {}
         for field in fields:
             row = Frame(container)
-            row.pack(fill="x", pady=3)
+            row.pack(fill=X, pady=3)
             Label(row, text=f"{field}:", width=12, anchor="w").pack(side=LEFT)
             entry = Entry(row, width=36)
-            entry.pack(side=RIGHT, fill="x", expand=True)
+            entry.pack(side=RIGHT, fill=X, expand=True)
             entry.insert(0, self.defaults.get(field, ""))
             self.entries[field] = entry
 
         buttons = Frame(container)
-        buttons.pack(fill="x", pady=(12, 0))
+        buttons.pack(fill=X, pady=(12, 0))
         Button(buttons, text="OK", width=12, bg="darkgreen", fg="white", command=self.submit).pack(side=LEFT)
         Button(buttons, text="Cancel", width=12, bg="red", fg="black", command=self.cancel).pack(side=RIGHT)
 
@@ -165,6 +158,8 @@ class TVMApp:
         self.debug = bool(getattr(cfg, "debug", {}).get("Flag", False))
         self.application = getattr(cfg, "terminal", {}).get("application", "gnome-terminal")
         self.status_var = StringVar(value="Ready.")
+        self.search_var = StringVar()
+        self.category_buttons: dict[str, Button] = {}
 
         if self.debug:
             logging.getLogger().setLevel(logging.DEBUG)
@@ -315,32 +310,29 @@ class TVMApp:
         win.title("Plugin Browser")
         win.geometry("900x420")
         win.protocol("WM_DELETE_WINDOW", win.destroy)
+
         outer = Frame(win, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
-        Label(
-            outer,
-            text=f"Plugin Browser — API v{PLUGIN_API_VERSION}",
-            bd=4,
-            width=40,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text=f"Plugin Browser — API v{PLUGIN_API_VERSION}", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)
         left = Frame(body)
         left.pack(side=LEFT, fill=Y)
         right = Frame(body)
         right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
+
         listbox = Listbox(left, width=36, height=18)
         listbox.pack(side=LEFT, fill=Y)
         scrollbar = Scrollbar(left, command=listbox.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         listbox.config(yscrollcommand=scrollbar.set)
+
         status_var = StringVar(value="Select a plugin to inspect.")
         info = Text(right, wrap="word", width=72, height=20)
         info.pack(fill=BOTH, expand=True)
-        Label(right, textvariable=status_var, anchor="w").pack(fill="x", pady=(6, 0))
+        Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
+
         snapshot: list[dict] = []
 
         def refresh_list() -> None:
@@ -376,18 +368,13 @@ class TVMApp:
             if item["error"]:
                 lines.extend(["Load error:", item["error"], ""])
             if item["status"] == "loaded":
-                lines.extend([
-                    "Expected entry point:",
-                    "def run(app, context): ...",
-                    "",
-                    "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version",
-                ])
+                lines.extend(["Expected entry point:", "def run(app, context): ...", "", "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version"])
             info.delete("1.0", END)
             info.insert("1.0", "\n".join(lines))
             status_var.set(f"Viewing: {item['display_name']}")
 
         buttons = Frame(outer)
-        buttons.pack(fill="x", pady=(8, 0))
+        buttons.pack(fill=X, pady=(8, 0))
         Button(buttons, text="Reload", command=refresh_list, bg="navy", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
         Button(buttons, text="Open Plugin Folder", command=self.open_plugin_folder, bg="darkgreen", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
         Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
@@ -468,15 +455,7 @@ class TVMApp:
         command = [sys.executable, "-m", "tvm.xdo_helper"]
         self.log(f"Running helper action={payload.get('action')} payload={payload}")
         try:
-            proc = subprocess.run(
-                command,
-                input=json.dumps(payload),
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=HELPER_TIMEOUT_SECONDS,
-                check=False,
-            )
+            proc = subprocess.run(command, input=json.dumps(payload), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=HELPER_TIMEOUT_SECONDS, check=False)
         except subprocess.TimeoutExpired as exc:
             raise TVMError("Helper timed out.") from exc
         except Exception as exc:
@@ -587,18 +566,114 @@ class TVMApp:
         cmd_type, cmd, options = parse_command_entry(entry)
         self.run_cmd(cmd_type, cmd, options, parent_window)
 
+    def category_matches_search(self, category: str, query: str) -> bool:
+        if not query:
+            return True
+        q = query.lower().strip()
+        if q in category.lower():
+            return True
+        for subcategory, entry in self.cfg.Categories.get(category, {}).items():
+            if q in subcategory.lower():
+                return True
+            try:
+                _cmd_type, cmd, _options = parse_command_entry(entry)
+            except Exception:
+                continue
+            if isinstance(cmd, str) and q in cmd.lower():
+                return True
+        return False
+
+    def update_category_filter(self, *_args) -> None:
+        query = self.search_var.get().strip()
+        visible = 0
+        for category, button in self.category_buttons.items():
+            if self.category_matches_search(category, query):
+                if not button.winfo_ismapped():
+                    button.pack(pady=2)
+                visible += 1
+            else:
+                if button.winfo_ismapped():
+                    button.pack_forget()
+        if query:
+            self.set_status(f"Search: showing {visible} matching categories.")
+        else:
+            self.status_var.set("Ready.")
+
+    def collect_search_results(self, query: str) -> list[tuple[str, str]]:
+        results: list[tuple[str, str]] = []
+        q = query.lower().strip()
+        if not q:
+            return results
+        for category, commands in self.cfg.Categories.items():
+            for subcategory, entry in commands.items():
+                text_parts = [category, subcategory]
+                try:
+                    _cmd_type, cmd, _options = parse_command_entry(entry)
+                    if isinstance(cmd, str):
+                        text_parts.append(cmd)
+                except Exception:
+                    pass
+                if q in " ".join(text_parts).lower():
+                    results.append((category, subcategory))
+        return results
+
+    def open_search_results(self, *_args) -> None:
+        query = self.search_var.get().strip()
+        if not query:
+            self.set_status("Enter a search term first.")
+            return
+        results = self.collect_search_results(query)
+        win = Toplevel(self.root)
+        win.title(f"Search Results: {query}")
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+        Label(win, text=f"Matches for: {query}", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(padx=8, pady=(8, 6))
+        if not results:
+            Label(win, text="No matching commands found.").pack(padx=8, pady=8)
+        else:
+            for category, subcategory in results:
+                Button(
+                    win,
+                    text=f"{category} → {subcategory}",
+                    width=40,
+                    bg="black",
+                    fg="yellow",
+                    command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s),
+                ).pack(pady=2, padx=8)
+        Button(win, text="Close", width=40, bg="red", fg="black", command=win.destroy).pack(pady=(8, 8))
+
+    def clear_search(self) -> None:
+        self.search_var.set("")
+        self.update_category_filter()
+
     def build_main(self) -> None:
         frame = Frame(self.root, padx=8, pady=8)
         frame.pack()
         Label(frame, text=f"{APP_NAME} {APP_VERSION}", bd=4, width=28, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
+        search_row = Frame(frame)
+        search_row.pack(fill=X, pady=(0, 8))
+        Label(search_row, text="Search:", width=8, anchor="w").pack(side=LEFT)
+        search_entry = Entry(search_row, textvariable=self.search_var, width=22)
+        search_entry.pack(side=LEFT, fill=X, expand=True)
+        Button(search_row, text="Go", width=6, command=self.open_search_results, bg="navy", fg="white").pack(side=LEFT, padx=(6, 0))
+        Button(search_row, text="Clear", width=6, command=self.clear_search, bg="gray", fg="white").pack(side=LEFT, padx=(6, 0))
+        self.search_var.trace_add("write", self.update_category_filter)
+        search_entry.bind("<Return>", self.open_search_results)
+
+        categories_frame = Frame(frame)
+        categories_frame.pack()
+        self.category_buttons = {}
         categories = getattr(self.cfg, "Categories", {})
         for category in categories:
-            Button(frame, text=category, width=28, bg="black", fg="yellow", command=lambda c=category: self.open_category(c)).pack(pady=2)
+            btn = Button(categories_frame, text=category, width=28, bg="black", fg="yellow", command=lambda c=category: self.open_category(c))
+            btn.pack(pady=2)
+            self.category_buttons[category] = btn
+
         Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=(8, 2))
         Button(frame, text="Plugin Browser", width=28, bg="purple", fg="white", command=self.open_plugin_browser).pack(pady=2)
         Button(frame, text="Reload Plugins", width=28, bg="navy", fg="white", command=self.reload_plugins_with_notice).pack(pady=2)
         Button(frame, text="Exit", width=28, bg="red", fg="black", command=self.on_close).pack(pady=(8, 4))
-        Label(frame, textvariable=self.status_var, anchor="w", justify="left", width=40, wraplength=320, bg="#f0f0f0", fg="black", relief="sunken", padx=6, pady=4).pack(fill="x", pady=(4, 0))
+        Label(frame, textvariable=self.status_var, anchor="w", justify="left", width=40, wraplength=320, bg="#f0f0f0", fg="black", relief="sunken", padx=6, pady=4).pack(fill=X, pady=(4, 0))
 
     def open_category(self, category: str) -> None:
         win = Toplevel(self.root)
