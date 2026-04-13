@@ -30,12 +30,13 @@ from tkinter import (
 )
 
 APP_NAME = "TVM"
-APP_VERSION = "0.2.7"
+APP_VERSION = "0.2.8"
 PLUGIN_API_VERSION = 1
 
 CONFIG_DIR = Path.home() / ".config" / "tvm"
 CONFIG_FILE = CONFIG_DIR / "config.py"
 PLUGIN_DIR = CONFIG_DIR / "plugins"
+STATE_FILE = CONFIG_DIR / "state.json"
 LOG_FILE = CONFIG_DIR / "tvm.log"
 HELPER_TIMEOUT_SECONDS = 20
 PLACEHOLDER_RE = re.compile(r"<([^<>]+)>")
@@ -76,6 +77,7 @@ def ensure_user_config() -> None:
         f"terminal = {repr(getattr(default_config, 'terminal', {'application': 'gnome-terminal'}))}",
         f"debug = {repr(getattr(default_config, 'debug', {'Flag': False}))}",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
+        "Favorites = []",
         "",
     ]
     CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
@@ -152,6 +154,7 @@ class TVMApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.window_id: int | str | None = None
+        self.last_window_id: int | str | None = None
         self.plugins: dict[str, object] = {}
         self.plugin_mtimes: dict[str, float] = {}
         self.plugin_errors: dict[str, str] = {}
@@ -164,6 +167,7 @@ class TVMApp:
         if self.debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
+        self.load_state()
         self.log("Starting TVM")
         self.load_plugins(force=True)
         self.build_main()
@@ -178,7 +182,30 @@ class TVMApp:
         self.status_var.set(message)
         self.log(message)
 
+    def load_state(self) -> None:
+        self.last_window_id = None
+        if not STATE_FILE.exists():
+            return
+        try:
+            data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+            self.last_window_id = data.get("last_window_id")
+        except Exception as exc:
+            self.log(f"Could not load state file: {exc}")
+
+    def save_state(self) -> None:
+        try:
+            payload = {"last_window_id": self.window_id if self.window_id is not None else self.last_window_id}
+            STATE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not save state file: {exc}")
+
+    def remember_window(self, window_id) -> None:
+        self.window_id = window_id
+        self.last_window_id = window_id
+        self.save_state()
+
     def on_close(self) -> None:
+        self.save_state()
         self.log("Shutting down TVM")
         try:
             self.root.quit()
@@ -265,7 +292,7 @@ class TVMApp:
         removed = sorted(old_names - new_names)
         changed = sorted(name for name in (new_names & old_names) if self.plugin_mtimes.get(name) != old_mtimes.get(name))
         failed = sorted(name for name in self.plugin_errors if old_errors.get(name) != self.plugin_errors.get(name))
-        parts: list[str] = []
+        parts = []
         if added:
             parts.append(f"Added: {', '.join(added)}")
         if changed:
@@ -280,7 +307,7 @@ class TVMApp:
         messagebox.showinfo("Plugins", "\n".join(parts))
 
     def get_plugin_snapshot(self) -> list[dict]:
-        snapshot: list[dict] = []
+        snapshot = []
         names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
         for name in names:
             file = PLUGIN_DIR / f"{name}.py"
@@ -289,31 +316,9 @@ class TVMApp:
                 mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
             if name in self.plugins:
                 meta = getattr(self.plugins[name], "__tvm_metadata__", {})
-                snapshot.append({
-                    "display_name": meta.get("display_name", name),
-                    "name": name,
-                    "status": "loaded",
-                    "plugin_version": meta.get("plugin_version", "0.1.0"),
-                    "api_version": meta.get("api_version", PLUGIN_API_VERSION),
-                    "compatible": meta.get("compatible", True),
-                    "description": meta.get("description", ""),
-                    "path": str(file),
-                    "mtime": mtime,
-                    "error": "",
-                })
+                snapshot.append({"display_name": meta.get("display_name", name), "name": name, "status": "loaded", "plugin_version": meta.get("plugin_version", "0.1.0"), "api_version": meta.get("api_version", PLUGIN_API_VERSION), "compatible": meta.get("compatible", True), "description": meta.get("description", ""), "path": str(file), "mtime": mtime, "error": ""})
             else:
-                snapshot.append({
-                    "display_name": name,
-                    "name": name,
-                    "status": "error",
-                    "plugin_version": "unknown",
-                    "api_version": "unknown",
-                    "compatible": False,
-                    "description": "",
-                    "path": str(file),
-                    "mtime": mtime,
-                    "error": self.plugin_errors.get(name, "Unknown plugin load error."),
-                })
+                snapshot.append({"display_name": name, "name": name, "status": "error", "plugin_version": "unknown", "api_version": "unknown", "compatible": False, "description": "", "path": str(file), "mtime": mtime, "error": self.plugin_errors.get(name, "Unknown plugin load error.")})
         return snapshot
 
     def open_plugin_browser(self) -> None:
@@ -322,30 +327,20 @@ class TVMApp:
         win.title("Plugin Browser")
         win.geometry("900x420")
         win.protocol("WM_DELETE_WINDOW", win.destroy)
-
         outer = Frame(win, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
         Label(outer, text=f"Plugin Browser — API v{PLUGIN_API_VERSION}", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
-
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)
-        left = Frame(body)
-        left.pack(side=LEFT, fill=Y)
-        right = Frame(body)
-        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
-
-        listbox = Listbox(left, width=36, height=18)
-        listbox.pack(side=LEFT, fill=Y)
-        scrollbar = Scrollbar(left, command=listbox.yview)
-        scrollbar.pack(side=RIGHT, fill=Y)
+        left = Frame(body); left.pack(side=LEFT, fill=Y)
+        right = Frame(body); right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
+        listbox = Listbox(left, width=36, height=18); listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=listbox.yview); scrollbar.pack(side=RIGHT, fill=Y)
         listbox.config(yscrollcommand=scrollbar.set)
-
         status_var = StringVar(value="Select a plugin to inspect.")
-        info = Text(right, wrap="word", width=72, height=20)
-        info.pack(fill=BOTH, expand=True)
+        info = Text(right, wrap="word", width=72, height=20); info.pack(fill=BOTH, expand=True)
         Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
-
-        snapshot: list[dict] = []
+        snapshot = []
 
         def refresh_list() -> None:
             self.load_plugins(force=False)
@@ -385,8 +380,7 @@ class TVMApp:
             info.insert("1.0", "\n".join(lines))
             status_var.set(f"Viewing: {item['display_name']}")
 
-        buttons = Frame(outer)
-        buttons.pack(fill=X, pady=(8, 0))
+        buttons = Frame(outer); buttons.pack(fill=X, pady=(8, 0))
         Button(buttons, text="Reload", command=refresh_list, bg="navy", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
         Button(buttons, text="Open Plugin Folder", command=self.open_plugin_folder, bg="darkgreen", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
         Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
@@ -423,22 +417,15 @@ class TVMApp:
         run_fn = getattr(plugin, "run", None)
         if not callable(run_fn):
             raise TVMError(f"Plugin '{plugin_name}' does not define run(app, context).")
-        context = {
-            "window_id": self.window_id,
-            "config": self.cfg,
-            "plugin_dir": PLUGIN_DIR,
-            "args": plugin_args.get("args", plugin_args),
-            "app_version": APP_VERSION,
-            "plugin_api_version": PLUGIN_API_VERSION,
-        }
+        context = {"window_id": self.window_id, "config": self.cfg, "plugin_dir": PLUGIN_DIR, "args": plugin_args.get("args", plugin_args), "app_version": APP_VERSION, "plugin_api_version": PLUGIN_API_VERSION}
         self.set_status(f"Running plugin: {plugin_name}")
         run_fn(self, context)
 
     def resolve_command_placeholders(self, cmd: str):
         if not isinstance(cmd, str):
             return cmd
-        seen: set[str] = set()
-        ordered_fields: list[str] = []
+        seen = set()
+        ordered_fields = []
         for field_name in PLACEHOLDER_RE.findall(cmd):
             if field_name not in seen:
                 seen.add(field_name)
@@ -488,6 +475,26 @@ class TVMApp:
             raise TVMError(result.get("error", "Helper reported an unknown error."))
         return result
 
+    def validate_window_id(self, window_id) -> bool:
+        if window_id in (None, "", "None"):
+            return False
+        try:
+            result = self._run_helper({"action": "validate_window", "window_id": window_id})
+            return bool(result.get("valid"))
+        except Exception:
+            return False
+
+    def reuse_last_window(self) -> bool:
+        if self.last_window_id is None:
+            self.set_status("No remembered window.")
+            return False
+        if self.validate_window_id(self.last_window_id):
+            self.window_id = self.last_window_id
+            self.set_status(f"Reusing remembered window: {self.window_id}")
+            return True
+        self.set_status("Remembered window is no longer valid.")
+        return False
+
     def select_target_window(self) -> None:
         self.root.withdraw()
         try:
@@ -499,7 +506,7 @@ class TVMApp:
         selected = result.get("window_id")
         if not selected:
             raise TVMError("No window selected.")
-        self.window_id = selected
+        self.remember_window(selected)
         self.set_status(f"Selected window: {self.window_id}")
 
     def select_target_window_with_notice(self) -> None:
@@ -511,9 +518,17 @@ class TVMApp:
 
     def safe_initial_select(self) -> None:
         try:
+            if self.reuse_last_window():
+                return
             self.select_target_window()
         except Exception as exc:
             self.log(f"Initial selection skipped: {exc}")
+
+    def forget_saved_window(self) -> None:
+        self.window_id = None
+        self.last_window_id = None
+        self.save_state()
+        self.set_status("Forgot remembered window.")
 
     def send_to_selected_window(self, cmd: str) -> None:
         if not self.window_id:
@@ -522,25 +537,19 @@ class TVMApp:
         try:
             result = self._run_helper({"action": "send", "window_id": self.window_id, "text": cmd, "key": "Return", "focus_delay_ms": 150})
             active_window = result.get("active_window")
+            self.remember_window(self.window_id)
             self.set_status(f"Sent to selected window {self.window_id} (active {active_window}).")
         except TVMError as exc:
             logging.warning("Send failed for window %s: %s", self.window_id, exc)
             self.window_id = None
-            raise TVMError(
-                "Could not send command to the selected window. "
-                "The target may have closed, activation may have failed, or the X11 helper failed. "
-                "Re-select the window and try again."
-            ) from exc
+            raise TVMError("Could not send command to the selected window. The target may have closed, activation may have failed, or the X11 helper failed. Re-select the window and try again.") from exc
 
     def send_text_to_window(self, text: str) -> None:
         self.send_to_selected_window(text)
 
-    def spawnTerminal(self, cmd: str) -> None:
+    def spawn_terminal(self, cmd: str) -> None:
         self.set_status(f"Spawning new terminal command: {cmd}")
         subprocess.Popen([self.application, "--", "bash", "-lc", cmd])
-
-    def spawn_terminal(self, cmd: str) -> None:
-        self.spawnTerminal(cmd)
 
     def run_detached(self, cmd: str) -> None:
         self.set_status(f"Running detached command: {cmd}")
@@ -618,7 +627,7 @@ class TVMApp:
             self.status_var.set("Ready.")
 
     def collect_search_results(self, query: str) -> list[tuple[str, str]]:
-        results: list[tuple[str, str]] = []
+        results = []
         q = query.lower().strip()
         if not q:
             return results
@@ -649,14 +658,7 @@ class TVMApp:
             Label(win, text="No matching commands found.").pack(padx=8, pady=8)
         else:
             for category, subcategory in results:
-                Button(
-                    win,
-                    text=f"{category} → {subcategory}",
-                    width=40,
-                    bg="black",
-                    fg="yellow",
-                    command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s),
-                ).pack(pady=2, padx=8)
+                Button(win, text=f"{category} → {subcategory}", width=40, bg="black", fg="yellow", command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s)).pack(pady=2, padx=8)
         Button(win, text="Close", width=40, bg="red", fg="black", command=win.destroy).pack(pady=(8, 8))
 
     def clear_search(self) -> None:
@@ -674,14 +676,7 @@ class TVMApp:
             favorites_frame = Frame(frame)
             favorites_frame.pack(fill=X, pady=(0, 8))
             for category, subcategory in favorites:
-                Button(
-                    favorites_frame,
-                    text=subcategory,
-                    width=13,
-                    bg="#1f4e79",
-                    fg="white",
-                    command=lambda c=category, s=subcategory: self.run_favorite(c, s),
-                ).pack(side=LEFT, padx=2, pady=2)
+                Button(favorites_frame, text=subcategory, width=13, bg="#1f4e79", fg="white", command=lambda c=category, s=subcategory: self.run_favorite(c, s)).pack(side=LEFT, padx=2, pady=2)
 
         search_row = Frame(frame)
         search_row.pack(fill=X, pady=(0, 8))
@@ -702,7 +697,9 @@ class TVMApp:
             btn.pack(pady=2)
             self.category_buttons[category] = btn
 
-        Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=(8, 2))
+        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=(8, 2))
+        Button(frame, text="Forget Saved Window", width=28, bg="#7f6000", fg="white", command=self.forget_saved_window).pack(pady=2)
+        Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=2)
         Button(frame, text="Plugin Browser", width=28, bg="purple", fg="white", command=self.open_plugin_browser).pack(pady=2)
         Button(frame, text="Reload Plugins", width=28, bg="navy", fg="white", command=self.reload_plugins_with_notice).pack(pady=2)
         Button(frame, text="Exit", width=28, bg="red", fg="black", command=self.on_close).pack(pady=(8, 4))

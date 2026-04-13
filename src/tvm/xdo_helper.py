@@ -15,10 +15,7 @@ def emit(payload: dict, code: int = 0) -> None:
 
 def require_tool(name: str) -> None:
     if shutil.which(name) is None:
-        emit(
-            {"status": "error", "error": f"Required tool '{name}' was not found in PATH."},
-            code=1,
-        )
+        emit({"status": "error", "error": f"Required tool '{name}' was not found in PATH."}, code=1)
 
 
 def run_command(args: list[str], timeout: int = 15) -> subprocess.CompletedProcess:
@@ -52,19 +49,20 @@ def parse_window_id_from_xwininfo(output: str) -> int | None:
 def select_window() -> None:
     require_tool("xwininfo")
     proc = run_command(["xwininfo"], timeout=60)
-
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
         emit({"status": "error", "error": f"xwininfo failed while selecting a window. {err}"}, code=1)
-
     window_id = parse_window_id_from_xwininfo(proc.stdout)
     if not window_id:
-        emit(
-            {"status": "error", "error": "Could not determine selected window id from xwininfo output."},
-            code=1,
-        )
-
+        emit({"status": "error", "error": "Could not determine selected window id from xwininfo output."}, code=1)
     emit({"status": "ok", "window_id": window_id})
+
+
+def validate_window(payload: dict) -> None:
+    require_tool("xprop")
+    window_id = str(payload["window_id"])
+    proc = run_command(["xprop", "-id", window_id], timeout=10)
+    emit({"status": "ok", "valid": proc.returncode == 0})
 
 
 def get_active_window() -> str:
@@ -72,7 +70,6 @@ def get_active_window() -> str:
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
         emit({"status": "error", "error": f"Could not get active window. {err}"}, code=1)
-
     active = (proc.stdout or "").strip()
     if not active:
         emit({"status": "error", "error": "xdotool returned no active window id."}, code=1)
@@ -81,7 +78,6 @@ def get_active_window() -> str:
 
 def send_to_window(payload: dict) -> None:
     require_tool("xdotool")
-
     window_id = str(payload["window_id"])
     text = str(payload.get("text", ""))
     key = str(payload.get("key", "Return"))
@@ -97,38 +93,25 @@ def send_to_window(payload: dict) -> None:
 
     active_window = get_active_window()
     if active_window != window_id:
-        emit(
-            {
-                "status": "error",
-                "error": f"Selected window did not become active. selected={window_id}, active={active_window}",
-            },
-            code=1,
-        )
+        emit({"status": "error", "error": f"Selected window did not become active. selected={window_id}, active={active_window}"}, code=1)
 
     if text:
         proc = run_command(["xdotool", "type", "--clearmodifiers", "--delay", "1", text], timeout=30)
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
-            emit(
-                {"status": "error", "error": f"Could not type into active window {active_window}. {err}"},
-                code=1,
-            )
+            emit({"status": "error", "error": f"Could not type into active window {active_window}. {err}"}, code=1)
 
     if key:
         proc = run_command(["xdotool", "key", "--clearmodifiers", key], timeout=15)
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
-            emit(
-                {"status": "error", "error": f"Could not send key '{key}' to active window {active_window}. {err}"},
-                code=1,
-            )
+            emit({"status": "error", "error": f"Could not send key '{key}' to active window {active_window}. {err}"}, code=1)
 
     emit({"status": "ok", "window_id": window_id, "active_window": active_window})
 
 
 def main() -> None:
     raw = sys.stdin.read()
-
     try:
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError as exc:
@@ -139,6 +122,8 @@ def main() -> None:
         select_window()
     elif action == "send":
         send_to_window(payload)
+    elif action == "validate_window":
+        validate_window(payload)
     else:
         emit({"status": "error", "error": f"Unknown action: {action!r}"}, code=1)
 
