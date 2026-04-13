@@ -1,232 +1,284 @@
 # TVM — Terminal Virtual Macropad
 
-TVM is a lightweight Tkinter-based macropad for Linux that sends commands to a selected terminal window.
+TVM is a lightweight **Tkinter-based command launcher** for Linux (Xorg) that lets you send commands directly to any terminal window or spawn new ones.
 
-## Features
+It acts like a **virtual macropad for your terminal**, with support for:
 
-- GUI-based macropad
-- Click-to-select target window
-- Command execution via `xdotool`
-- Configurable button grid
-- Plugin system
-- Plugin hot reload
-- Plugin Browser UI
-- Plugin API versioning
-- Desktop launcher support
-- Works on Ubuntu / Xorg
+* window targeting
+* command categories
+* placeholder prompts
+* confirmation dialogs
+* plugin system
 
-## Requirements
+---
 
-- Linux (Xorg session)
-- Python 3.10+
-- External tools:
+## ✨ Features
+
+* 🖱️ Select any X11 window as a command target
+* ⌨️ Send commands directly into an existing terminal
+* 🧩 Plugin system with hot reload
+* 🧠 Smart placeholders like `<path>`, `<user>`, `<host>`
+* 🔐 Optional confirmation for dangerous commands
+* 📂 Organized categories and subcommands
+* 📊 Status bar feedback
+* 🧪 Designed for rapid iteration and customization
+
+---
+
+## 📦 Installation
+
+### Option 1 — Development (recommended)
 
 ```bash
-sudo apt install xdotool x11-utils
-```
-
-## Installation
-
-Using pipx:
-
-```bash
-sudo apt install pipx
-pipx ensurepath
-pipx install tvm
+git clone https://github.com/cmora111/tvm
+cd tvm
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
 ```
 
 Run:
 
 ```bash
+python -m tvm
+# or
 tvm
 ```
 
-## Development
+---
+
+### Option 2 — Without install (quick run)
 
 ```bash
-git clone https://github.com/cmora111/tvm
-cd tvm
-pipx install -e .
+PYTHONPATH=src python -m tvm
 ```
 
-Or without installing:
+---
+
+## 🧰 Requirements
+
+* Linux (Xorg session)
+* Python 3.10+
+* `xdotool`
+* `xwininfo`
+
+Install dependencies:
 
 ```bash
-PYTHONPATH=src python3 -m tvm
+sudo apt install xdotool x11-utils
 ```
 
-## Configuration
+---
 
-TVM loads config from:
+## 🚀 Usage
 
-```text
+### 1. Select a target window
+
+Click:
+
+```
+Select Window → Select window
+```
+
+Then click any terminal.
+
+---
+
+### 2. Run commands
+
+Example categories:
+
+```
+Admin_CMDs → ls
+Admin_CMDs → pwd
+Admin_CMDs → cd
+```
+
+Commands are sent directly to the selected terminal.
+
+---
+
+## 🧠 Placeholders
+
+Commands can include placeholders:
+
+```bash
+cd <path>
+ssh <user>@<host>
+```
+
+TVM will prompt you for each value before execution.
+
+---
+
+## 🔐 Confirmation
+
+Add confirmation for risky commands:
+
+```python
+'Danger Upgrade': [2, 'sudo apt upgrade -y', {'confirm': True}]
+```
+
+You’ll get a popup before execution.
+
+---
+
+## ⚙️ Configuration
+
+Config file location:
+
+```bash
 ~/.config/tvm/config.py
 ```
 
-Copy the example:
-
-```bash
-mkdir -p ~/.config/tvm
-cp examples/config.py ~/.config/tvm/config.py
-```
-
-## Plugin System
-
-Plugin files live in:
-
-```text
-~/.config/tvm/plugins/
-```
-
-Each plugin must define:
+Example:
 
 ```python
-def run(app, context):
-    ...
-```
+debug = {'Flag': False}
 
-### Plugin metadata
+terminal = {'application': 'gnome-terminal'}
 
-Plugins may also define:
+Categories = {
+    'Select Window': {
+        'Select window': [0, 'None'],
+    },
 
-```python
-PLUGIN_NAME = "Hello World"
-PLUGIN_VERSION = "1.0.0"
-PLUGIN_DESCRIPTION = "Example plugin"
-TVM_PLUGIN_API_VERSION = 1
-```
+    'Admin_CMDs': {
+        'ls': [2, 'ls'],
+        'cd': [2, 'cd <path>'],
+        'ssh': [2, 'ssh <user>@<host>'],
+        'Danger Upgrade': [2, 'sudo apt upgrade -y', {'confirm': True}],
+    },
 
-### Plugin Example
+    'Applications': {
+        'htop': [1, 'htop'],
+        'VS Code': [3, 'code > /dev/null 2>&1 &'],
+    },
 
-Create a plugin:
-
-```bash
-mkdir -p ~/.config/tvm/plugins
-nano ~/.config/tvm/plugins/hello_world.py
-```
-
-```python
-PLUGIN_NAME = "Hello World"
-PLUGIN_VERSION = "1.0.0"
-PLUGIN_DESCRIPTION = "Example TVM plugin"
-TVM_PLUGIN_API_VERSION = 1
-
-def run(app, context):
-    args = context.get("args", {})
-    message = args.get("message", "Hello from TVM!")
-
-    if context.get("window_id"):
-        app.send_text_to_window(f'echo "{message}"')
-
-    print(message)
-```
-
-Add a button in your config:
-
-```python
-{
-    "label": "Hello World",
-    "type": "plugin",
-    "plugin": {
-        "plugin": "hello_world",
-        "args": {
-            "message": "This came from config!"
-        }
-    }
+    'Plugins': {
+        'Hello World Plugin': ['plugin', 'hello_world'],
+    },
 }
 ```
 
-## Plugin Browser
+---
 
-TVM includes a built-in **Plugin Browser** window.
-
-It shows:
-
-- plugin name
-- plugin version
-- plugin API version
-- compatibility with the current TVM build
-- file path
-- last modified time
-- load errors
-
-Use it to verify that plugins loaded correctly and to spot API mismatches quickly.
-
-## Plugin Hot Reload
-
-TVM automatically reloads plugin files when they change.
-
-You can also click **Reload Plugins** in the main window.
-
-## Desktop Integration
-
-Create a launcher:
-
-```bash
-mkdir -p ~/.local/share/applications
-nano ~/.local/share/applications/tvm.desktop
-```
-
-Paste:
-
-```ini
-[Desktop Entry]
-Name=TVM
-Comment=Terminal Virtual Macropad
-Exec=tvm
-Icon=utilities-terminal
-Terminal=false
-Type=Application
-Categories=Utility;
-```
-
-Make executable:
-
-```bash
-chmod +x ~/.local/share/applications/tvm.desktop
-```
-
-## Project Structure
+## 🧩 Command Types
 
 ```text
-tvm/
-├── src/tvm/
-│   ├── app.py
-│   ├── cli.py
-│   ├── xdo_helper.py
-│   └── default_config.py
-├── examples/
-│   ├── config.py
-│   └── plugins/
-│       └── hello_world.py
-├── README.md
-├── PLUGIN_API.md
-└── pyproject.toml
+0 → Select window
+1 → Spawn new terminal
+2 → Send to selected window
+3 → Run detached command
+'plugin' → Run plugin
 ```
 
-## How It Works
+---
 
-TVM uses external X11 tools for stability:
+## 🔌 Plugins
 
-1. `xwininfo` — select window
-2. `xdotool` — send commands
-3. subprocess isolation — prevents crashes in the GUI process
-
-## Troubleshooting
-
-### Nothing happens
-- Reselect the window
-- Ensure the terminal still exists
-
-### Not launching from menu
+Plugins live in:
 
 ```bash
-update-desktop-database ~/.local/share/applications
+~/.config/tvm/plugins/
 ```
 
-### Wayland
-TVM currently requires Xorg.
+Example plugin:
 
-## License
+```python
+PLUGIN_NAME = "Hello World"
+PLUGIN_VERSION = "1.0.0"
+TVM_PLUGIN_API_VERSION = 1
+
+def run(app, context):
+    app.send_text_to_window('echo "Hello from plugin!"')
+```
+
+Reload plugins inside the app.
+
+---
+
+## 🖥️ UI Overview
+
+Main window:
+
+* Category buttons
+* Window selector
+* Plugin tools
+* Status bar
+
+Category window:
+
+* Command buttons
+* Stays open for repeated use
+
+---
+
+## ⚠️ Notes
+
+* Works only on **Xorg**, not Wayland
+* Window activation depends on your window manager
+* Some terminals may block synthetic input
+
+---
+
+## 🛠️ Development
+
+Project layout:
+
+```text
+src/tvm/
+├── app.py
+├── cli.py
+├── xdo_helper.py
+├── default_config.py
+```
+
+Run in dev mode:
+
+```bash
+pip install -e .
+```
+
+---
+
+## 🧼 Cleanup
+
+See:
+
+```
+CLEANUP.md
+```
+
+---
+
+## 📌 Roadmap
+
+* Multi-field form UI for placeholders
+* Command search
+* Favorites / pinned commands
+* Config editor UI
+* Profiles (multiple configs)
+* Command history
+* Plugin permissions system
+
+---
+
+## 📄 License
 
 MIT License
+
+---
+
+## 🙌 Author
+
+Carlos Mora
+https://github.com/cmora111
+
+---
+
+## ⭐ Contributing
+
+Pull requests welcome.
+Ideas, plugins, and improvements are encouraged.
+
