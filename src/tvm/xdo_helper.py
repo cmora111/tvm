@@ -32,10 +32,7 @@ def run_command(args: list[str], timeout: int = 15) -> subprocess.CompletedProce
             check=False,
         )
     except subprocess.TimeoutExpired:
-        emit(
-            {"status": "error", "error": f"Command timed out: {' '.join(args)}"},
-            code=1,
-        )
+        emit({"status": "error", "error": f"Command timed out: {' '.join(args)}"}, code=1)
 
 
 def parse_window_id_from_xwininfo(output: str) -> int | None:
@@ -58,10 +55,7 @@ def select_window() -> None:
 
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
-        emit(
-            {"status": "error", "error": f"xwininfo failed while selecting a window. {err}"},
-            code=1,
-        )
+        emit({"status": "error", "error": f"xwininfo failed while selecting a window. {err}"}, code=1)
 
     window_id = parse_window_id_from_xwininfo(proc.stdout)
     if not window_id:
@@ -72,11 +66,13 @@ def select_window() -> None:
 
     emit({"status": "ok", "window_id": window_id})
 
+
 def get_active_window() -> str:
     proc = run_command(["xdotool", "getactivewindow"], timeout=10)
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
         emit({"status": "error", "error": f"Could not get active window. {err}"}, code=1)
+
     active = (proc.stdout or "").strip()
     if not active:
         emit({"status": "error", "error": "xdotool returned no active window id."}, code=1)
@@ -94,33 +90,23 @@ def send_to_window(payload: dict) -> None:
     proc = run_command(["xdotool", "windowactivate", "--sync", window_id], timeout=15)
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
-        emit(
-            {"status": "error", "error": f"Could not activate window {window_id}. {err}"},
-            code=1,
-        )
+        emit({"status": "error", "error": f"Could not activate window {window_id}. {err}"}, code=1)
 
     if focus_delay_ms > 0:
         time.sleep(focus_delay_ms / 1000.0)
 
     active_window = get_active_window()
-
     if active_window != window_id:
         emit(
             {
                 "status": "error",
-                "error": (
-                    f"Selected window did not become active. "
-                    f"selected={window_id}, active={active_window}"
-                ),
+                "error": f"Selected window did not become active. selected={window_id}, active={active_window}",
             },
             code=1,
         )
 
     if text:
-        proc = run_command(
-            ["xdotool", "type", "--clearmodifiers", "--delay", "1", text],
-            timeout=30,
-        )
+        proc = run_command(["xdotool", "type", "--clearmodifiers", "--delay", "1", text], timeout=30)
         if proc.returncode != 0:
             err = (proc.stderr or proc.stdout or "").strip()
             emit(
@@ -149,7 +135,6 @@ def main() -> None:
         emit({"status": "error", "error": f"Invalid JSON payload: {exc}"}, code=1)
 
     action = payload.get("action")
-
     if action == "select_window":
         select_window()
     elif action == "send":
