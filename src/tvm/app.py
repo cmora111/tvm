@@ -30,7 +30,7 @@ from tkinter import (
 )
 
 APP_NAME = "TVM"
-APP_VERSION = "0.2.6"
+APP_VERSION = "0.2.7"
 PLUGIN_API_VERSION = 1
 
 CONFIG_DIR = Path.home() / ".config" / "tvm"
@@ -184,6 +184,18 @@ class TVMApp:
             self.root.quit()
         finally:
             self.root.destroy()
+
+    def get_favorites(self) -> list[tuple[str, str]]:
+        favs = []
+        raw = getattr(self.cfg, "Favorites", [])
+        if not isinstance(raw, list):
+            return favs
+        for item in raw:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                category, subcategory = item[0], item[1]
+                if category in getattr(self.cfg, "Categories", {}) and subcategory in self.cfg.Categories[category]:
+                    favs.append((category, subcategory))
+        return favs
 
     def _read_plugin_metadata(self, module, file: Path) -> dict:
         api_version = getattr(module, "TVM_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
@@ -523,9 +535,12 @@ class TVMApp:
     def send_text_to_window(self, text: str) -> None:
         self.send_to_selected_window(text)
 
-    def spawn_terminal(self, cmd: str) -> None:
+    def spawnTerminal(self, cmd: str) -> None:
         self.set_status(f"Spawning new terminal command: {cmd}")
         subprocess.Popen([self.application, "--", "bash", "-lc", cmd])
+
+    def spawn_terminal(self, cmd: str) -> None:
+        self.spawnTerminal(cmd)
 
     def run_detached(self, cmd: str) -> None:
         self.set_status(f"Running detached command: {cmd}")
@@ -565,6 +580,9 @@ class TVMApp:
         entry = self.cfg.Categories[category][subcategory]
         cmd_type, cmd, options = parse_command_entry(entry)
         self.run_cmd(cmd_type, cmd, options, parent_window)
+
+    def run_favorite(self, category: str, subcategory: str) -> None:
+        self.select_cmd(None, category, subcategory)
 
     def category_matches_search(self, category: str, query: str) -> bool:
         if not query:
@@ -649,6 +667,21 @@ class TVMApp:
         frame = Frame(self.root, padx=8, pady=8)
         frame.pack()
         Label(frame, text=f"{APP_NAME} {APP_VERSION}", bd=4, width=28, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
+        favorites = self.get_favorites()
+        if favorites:
+            Label(frame, text="Favorites", width=28, bg="#d9edf7", fg="black", relief="groove").pack(pady=(0, 4))
+            favorites_frame = Frame(frame)
+            favorites_frame.pack(fill=X, pady=(0, 8))
+            for category, subcategory in favorites:
+                Button(
+                    favorites_frame,
+                    text=subcategory,
+                    width=13,
+                    bg="#1f4e79",
+                    fg="white",
+                    command=lambda c=category, s=subcategory: self.run_favorite(c, s),
+                ).pack(side=LEFT, padx=2, pady=2)
 
         search_row = Frame(frame)
         search_row.pack(fill=X, pady=(0, 8))
