@@ -71,7 +71,13 @@ Categories = {
         'Danger Chain': ['chain', [
             [2, 'echo starting'],
             [2, 'sudo apt upgrade -y', {'confirm': True}],
-        ]]
+        ]],
+
+        'Shared Test': ['chain', [
+            ['vars', ['path']],
+            [2, 'cd <path>'],
+            [2, 'echo path is <path>'],
+        ]],
     }
 }
 Favorites = [

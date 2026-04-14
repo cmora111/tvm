@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import time
 import importlib.util
 import json
 import logging
 import re
 import subprocess
 import sys
+import time
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +17,7 @@ from tkinter import (
 )
 
 APP_NAME = "TVM"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.3.1"
 PLUGIN_API_VERSION = 1
 MAX_HISTORY = 30
 
@@ -212,54 +212,6 @@ class TVMApp:
         self.command_history = self.command_history[:MAX_HISTORY]
         self.save_state()
 
-    def select_profile(self, name):
-        windows = getattr(self.cfg, "Windows", None)
-
-        if windows is None or not isinstance(windows, dict):
-            windows = {}
-            setattr(self.cfg, "Windows", windows)
-
-        saved = windows.get(name)
-
-        if saved and self.validate_window_id(saved):
-            self.window_id = saved
-            self.set_status(f"Using profile '{name}' -> {saved}")
-            return
-
-        self.set_status(f"Select window for profile '{name}'")
-        self.select_target_window()
-
-        windows[name] = self.window_id
-
-        try:
-            import pprint
-            import re
-
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                text = f.read()
-
-            new_windows = pprint.pformat(windows, indent=4)
-
-            if re.search(r"(?m)^Windows\s*=", text):
-                text = re.sub(
-                    r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)",
-                    f"Windows = {new_windows}\n",
-                    text,
-                )
-            else:
-                text += f"\n\nWindows = {new_windows}\n"
-
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                f.write(text)
-
-        except Exception as e:
-            self.log(f"Could not persist window profile: {e}")
-
-
-    def run_sleep(self, seconds):
-        self.set_status(f"Sleeping {seconds}s...")
-        time.sleep(float(seconds))
-
     def on_close(self) -> None:
         self.save_state()
         self.log("Shutting down TVM")
@@ -329,11 +281,11 @@ class TVMApp:
                 mtimes[name] = mtime
             except Exception as exc:
                 errors[name] = str(exc)
-            self.plugins = plugins
-            self.plugin_mtimes = mtimes
-            self.plugin_errors = errors
-            self.log(f"Plugins loaded: {len(self.plugins)} ok, {len(self.plugin_errors)} errors")
-            return self.plugins
+        self.plugins = plugins
+        self.plugin_mtimes = mtimes
+        self.plugin_errors = errors
+        self.log(f"Plugins loaded: {len(self.plugins)} ok, {len(self.plugin_errors)} errors")
+        return self.plugins
 
     def reload_plugins_with_notice(self) -> None:
         old_names = set(self.plugins)
@@ -358,87 +310,6 @@ class TVMApp:
             parts.append("No plugin changes detected.")
         self.set_status("Plugins reloaded.")
         messagebox.showinfo("Plugins", "\n".join(parts))
-
-    def get_plugin_snapshot(self) -> list[dict]:
-        snapshot = []
-        names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
-        for name in names:
-            file = PLUGIN_DIR / f"{name}.py"
-            mtime = "unknown"
-            if file.exists():
-                mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-            if name in self.plugins:
-                meta = getattr(self.plugins[name], "__tvm_metadata__", {})
-                snapshot.append({"display_name": meta.get("display_name", name), "name": name, "status": "loaded", "plugin_version": meta.get("plugin_version", "0.1.0"), "api_version": meta.get("api_version", PLUGIN_API_VERSION), "compatible": meta.get("compatible", True), "description": meta.get("description", ""), "path": str(file), "mtime": mtime, "error": ""})
-            else:
-                snapshot.append({"display_name": name, "name": name, "status": "error", "plugin_version": "unknown", "api_version": "unknown", "compatible": False, "description": "", "path": str(file), "mtime": mtime, "error": self.plugin_errors.get(name, "Unknown plugin load error.")})
-        return snapshot
-
-    def open_plugin_browser(self) -> None:
-        self.load_plugins(force=False)
-        win = Toplevel(self.root)
-        win.title("Plugin Browser")
-        win.geometry("900x420")
-        win.protocol("WM_DELETE_WINDOW", win.destroy)
-        outer = Frame(win, padx=8, pady=8)
-        outer.pack(fill=BOTH, expand=True)
-        Label(outer, text=f"Plugin Browser — API v{PLUGIN_API_VERSION}", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
-        body = Frame(outer)
-        body.pack(fill=BOTH, expand=True)
-        left = Frame(body); left.pack(side=LEFT, fill=Y)
-        right = Frame(body); right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
-        listbox = Listbox(left, width=36, height=18); listbox.pack(side=LEFT, fill=Y)
-        scrollbar = Scrollbar(left, command=listbox.yview); scrollbar.pack(side=RIGHT, fill=Y)
-        listbox.config(yscrollcommand=scrollbar.set)
-        status_var = StringVar(value="Select a plugin to inspect.")
-        info = Text(right, wrap="word", width=72, height=20); info.pack(fill=BOTH, expand=True)
-        Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
-        snapshot = []
-
-    def refresh_list() -> None:
-        self.load_plugins(force=False)
-        listbox.delete(0, END)
-        snapshot.clear()
-        snapshot.extend(self.get_plugin_snapshot())
-        for item in snapshot:
-            prefix = "✓" if item["status"] == "loaded" else "✗"
-            listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
-        info.delete("1.0", END)
-        info.insert("1.0", "Select a plugin to inspect.\n")
-        status_var.set(f"{len(snapshot)} plugin file(s) found.")
-
-    def show_selected(_event=None) -> None:
-        idxs = listbox.curselection()
-        if not idxs:
-            return
-        item = snapshot[idxs[0]]
-        lines = [
-            f"Name: {item['display_name']}",
-            f"Internal name: {item['name']}",
-            f"Status: {item['status']}",
-            f"Plugin version: {item['plugin_version']}",
-            f"Plugin API version: {item['api_version']}",
-            f"Compatible with TVM: {item['compatible']}",
-            f"Path: {item['path']}",
-            f"Last modified: {item['mtime']}",
-            "",
-        ]
-        if item["description"]:
-            lines.extend(["Description:", item["description"], ""])
-        if item["error"]:
-            lines.extend(["Load error:", item["error"], ""])
-        if item["status"] == "loaded":
-            lines.extend(["Expected entry point:", "def run(app, context): ...", "", "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version"])
-        info.delete("1.0", END)
-        info.insert("1.0", "\n".join(lines))
-        status_var.set(f"Viewing: {item['display_name']}")
-
-        buttons = Frame(outer); buttons.pack(fill=X, pady=(8, 0))
-        Button(buttons, text="Reload", command=refresh_list, bg="navy", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Open Plugin Folder", command=self.open_plugin_folder, bg="darkgreen", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
-        listbox.bind("<<ListboxSelect>>", show_selected)
-        refresh_list()
 
     def open_plugin_folder(self) -> None:
         try:
@@ -475,93 +346,187 @@ class TVMApp:
         self.add_history_entry("plugin", plugin_name, source="plugin")
         run_fn(self, context)
 
-    def open_history_window(self) -> None:
+    def get_plugin_snapshot(self) -> list[dict]:
+        snapshot = []
+        names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
+        for name in names:
+            file = PLUGIN_DIR / f"{name}.py"
+            mtime = "unknown"
+            if file.exists():
+                mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            if name in self.plugins:
+                meta = getattr(self.plugins[name], "__tvm_metadata__", {})
+                snapshot.append({
+                    "display_name": meta.get("display_name", name),
+                    "name": name,
+                    "status": "loaded",
+                    "plugin_version": meta.get("plugin_version", "0.1.0"),
+                    "api_version": meta.get("api_version", PLUGIN_API_VERSION),
+                    "compatible": meta.get("compatible", True),
+                    "description": meta.get("description", ""),
+                    "path": str(file),
+                    "mtime": mtime,
+                    "error": "",
+                })
+            else:
+                snapshot.append({
+                    "display_name": name,
+                    "name": name,
+                    "status": "error",
+                    "plugin_version": "unknown",
+                    "api_version": "unknown",
+                    "compatible": False,
+                    "description": "",
+                    "path": str(file),
+                    "mtime": mtime,
+                    "error": self.plugin_errors.get(name, "Unknown plugin load error."),
+                })
+        return snapshot
+
+
+    def open_plugin_browser(self) -> None:
+        self.load_plugins(force=False)
         win = Toplevel(self.root)
-        win.title("Command History")
+        win.title("Plugin Browser")
         win.geometry("900x420")
         win.protocol("WM_DELETE_WINDOW", win.destroy)
+
         outer = Frame(win, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
-        Label(outer, text="Recent Commands", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
+        Label(
+            outer,
+            text=f"Plugin Browser — API v{PLUGIN_API_VERSION}",
+            bd=4,
+            width=40,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)
-        left = Frame(body); left.pack(side=LEFT, fill=Y)
-        right = Frame(body); right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
-        listbox = Listbox(left, width=44, height=18)
+
+        left = Frame(body)
+        left.pack(side=LEFT, fill=Y)
+
+        right = Frame(body)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
+
+        listbox = Listbox(left, width=36, height=18)
         listbox.pack(side=LEFT, fill=Y)
+
         scrollbar = Scrollbar(left, command=listbox.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         listbox.config(yscrollcommand=scrollbar.set)
+
+        status_var = StringVar(value="Select a plugin to inspect.")
         info = Text(right, wrap="word", width=72, height=20)
         info.pack(fill=BOTH, expand=True)
-        selected_entry = {"value": None}
+        Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
 
-    def refresh() -> None:
-        listbox.delete(0, END)
-        for entry in self.command_history:
-            label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
-            listbox.insert(END, label)
-        info.delete("1.0", END)
-        info.insert("1.0", "Select a history entry to inspect or rerun.\n")
+        snapshot = []
 
-    def show_selected(_event=None) -> None:
-        idxs = listbox.curselection()
-        if not idxs:
-            return
-        entry = self.command_history[idxs[0]]
-        selected_entry["value"] = entry
-        lines = [
-            f"Time: {entry.get('timestamp','')}",
-            f"Action: {entry.get('action_type','')}",
-            f"Source: {entry.get('source','')}",
-            f"Window ID: {entry.get('window_id','')}",
-            "",
-            "Command:",
-            entry.get("command",""),
-        ]
-        info.delete("1.0", END)
-        info.insert("1.0", "\n".join(lines))
+        def refresh_list() -> None:
+            self.load_plugins(force=False)
+            listbox.delete(0, END)
+            snapshot.clear()
+            snapshot.extend(self.get_plugin_snapshot())
+            for item in snapshot:
+                prefix = "✓" if item["status"] == "loaded" else "✗"
+                listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
+            info.delete("1.0", END)
+            info.insert("1.0", "Select a plugin to inspect.\n")
+            status_var.set(f"{len(snapshot)} plugin file(s) found.")
 
-    def rerun_selected() -> None:
-        entry = selected_entry["value"]
-        if not entry:
-            self.set_status("Select a history entry first.")
-            return
-        self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
+        def show_selected(_event=None) -> None:
+            idxs = listbox.curselection()
+            if not idxs:
+                return
+            item = snapshot[idxs[0]]
+            lines = [
+                f"Name: {item['display_name']}",
+                f"Internal name: {item['name']}",
+                f"Status: {item['status']}",
+                f"Plugin version: {item['plugin_version']}",
+                f"Plugin API version: {item['api_version']}",
+                f"Compatible with TVM: {item['compatible']}",
+                f"Path: {item['path']}",
+                f"Last modified: {item['mtime']}",
+                "",
+            ]
+            if item["description"]:
+                lines.extend(["Description:", item["description"], ""])
+            if item["error"]:
+                lines.extend(["Load error:", item["error"], ""])
+            if item["status"] == "loaded":
+                lines.extend([
+                    "Expected entry point:",
+                    "def run(app, context): ...",
+                    "",
+                    "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version",
+                ])
+            info.delete("1.0", END)
+            info.insert("1.0", "\n".join(lines))
+            status_var.set(f"Viewing: {item['display_name']}")
 
-    def clear_history() -> None:
-        if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
-            return
-        self.command_history = []
-        self.save_state()
-        refresh()
-        self.set_status("Command history cleared.")
+        buttons = Frame(outer)
+        buttons.pack(fill=X, pady=(8, 0))
 
-        buttons = Frame(outer); buttons.pack(fill=X, pady=(8, 0))
-        Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Clear History", command=clear_history, bg="#7f6000", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
+        Button(
+            buttons,
+            text="Reload",
+            command=refresh_list,
+            bg="navy",
+            fg="white",
+            width=16,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            buttons,
+            text="Open Plugin Folder",
+            command=self.open_plugin_folder,
+            bg="darkgreen",
+            fg="white",
+            width=16,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            buttons,
+            text="Close",
+            command=win.destroy,
+            bg="red",
+            fg="black",
+            width=16,
+        ).pack(side=RIGHT)
+
         listbox.bind("<<ListboxSelect>>", show_selected)
-        refresh()
+        refresh_list()
 
-    def resolve_command_placeholders(self, cmd: str):
+    def resolve_command_placeholders(self, cmd: str, shared_vars: dict[str, str] | None = None):
         if not isinstance(cmd, str):
             return cmd
+        shared_vars = shared_vars or {}
         seen = set()
-        ordered_fields = []
+        prompt_fields = []
         for field_name in PLACEHOLDER_RE.findall(cmd):
+            if field_name in shared_vars:
+                continue
             if field_name not in seen:
                 seen.add(field_name)
-                ordered_fields.append(field_name)
-        if not ordered_fields:
-            return cmd
-        prompt = MultiFieldPrompt(self.root, "Command Input", ordered_fields)
-        values = prompt.show()
-        if values is None:
-            self.set_status("Command cancelled.")
-            return None
+                prompt_fields.append(field_name)
+
+        values = dict(shared_vars)
+        if prompt_fields:
+            prompt = MultiFieldPrompt(self.root, "Command Input", prompt_fields)
+            entered = prompt.show()
+            if entered is None:
+                self.set_status("Command cancelled.")
+                return None
+            values.update(entered)
+
         resolved = cmd
-        for field_name in ordered_fields:
+        for field_name in PLACEHOLDER_RE.findall(cmd):
             resolved = resolved.replace(f"<{field_name}>", values.get(field_name, ""))
         return resolved
 
@@ -573,19 +538,10 @@ class TVMApp:
             msg += f"\nTarget window: {self.window_id}"
         return messagebox.askokcancel("Confirm Command", msg)
 
-    def run_sleep(self, seconds):
-        self.set_status(f"Sleeping {seconds}s...")
-        time.sleep(float(seconds))
-
     def _run_helper(self, payload: dict) -> dict:
         command = [sys.executable, "-m", "tvm.xdo_helper"]
         self.log(f"Running helper action={payload.get('action')} payload={payload}")
-        try:
-            proc = subprocess.run(command, input=json.dumps(payload), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=HELPER_TIMEOUT_SECONDS, check=False)
-        except subprocess.TimeoutExpired as exc:
-            raise TVMError("Helper timed out.") from exc
-        except Exception as exc:
-            raise TVMError(f"Could not start helper: {exc}") from exc
+        proc = subprocess.run(command, input=json.dumps(payload), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=HELPER_TIMEOUT_SECONDS, check=False)
         stdout = (proc.stdout or "").strip()
         stderr = (proc.stderr or "").strip()
         if stderr:
@@ -594,12 +550,9 @@ class TVMApp:
             raise TVMError(f"Helper exited with code {proc.returncode}" + (f": {stderr}" if stderr else ""))
         if not stdout:
             raise TVMError("Helper returned no data.")
-        try:
-            result = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            raise TVMError(f"Helper returned invalid JSON: {stdout!r}") from exc
-            if result.get("status") != "ok":
-                raise TVMError(result.get("error", "Helper reported an unknown error."))
+        result = json.loads(stdout)
+        if result.get("status") != "ok":
+            raise TVMError(result.get("error", "Helper reported an unknown error."))
         return result
 
     def validate_window_id(self, window_id) -> bool:
@@ -661,16 +614,11 @@ class TVMApp:
         if not self.window_id:
             raise TVMError("No target window selected.")
         self.set_status(f"Sending to window {self.window_id}: {cmd}")
-        try:
-            result = self._run_helper({"action": "send", "window_id": self.window_id, "text": cmd, "key": "Return", "focus_delay_ms": 150})
-            active_window = result.get("active_window")
-            self.remember_window(self.window_id)
-            self.add_history_entry(2, cmd, source="send")
-            self.set_status(f"Sent to selected window {self.window_id} (active {active_window}).")
-        except TVMError as exc:
-            logging.warning("Send failed for window %s: %s", self.window_id, exc)
-            self.window_id = None
-            raise TVMError("Could not send command to the selected window. The target may have closed, activation may have failed, or the X11 helper failed. Re-select the window and try again.") from exc
+        result = self._run_helper({"action": "send", "window_id": self.window_id, "text": cmd, "key": "Return", "focus_delay_ms": 150})
+        active_window = result.get("active_window")
+        self.remember_window(self.window_id)
+        self.add_history_entry(2, cmd, source="send")
+        self.set_status(f"Sent to selected window {self.window_id} (active {active_window}).")
 
     def send_text_to_window(self, text: str) -> None:
         self.send_to_selected_window(text)
@@ -687,17 +635,69 @@ class TVMApp:
         self.set_status(f"Running detached command: {cmd}")
         subprocess.Popen(cmd, shell=True)
 
+    def select_profile(self, name):
+        windows = getattr(self.cfg, "Windows", None)
+        if windows is None or not isinstance(windows, dict):
+            windows = {}
+            setattr(self.cfg, "Windows", windows)
+
+        saved = windows.get(name)
+        if saved and self.validate_window_id(saved):
+            self.window_id = saved
+            self.set_status(f"Using profile '{name}' -> {saved}")
+            return
+
+        self.set_status(f"Select window for profile '{name}'")
+        self.select_target_window()
+        windows[name] = self.window_id
+
+        try:
+            import pprint
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            new_windows = pprint.pformat(windows, indent=4)
+            if re.search(r"(?m)^Windows\s*=", text):
+                text = re.sub(r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)", f"Windows = {new_windows}\n", text)
+            else:
+                text += f"\n\nWindows = {new_windows}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist window profile: {exc}")
+
+    def run_sleep(self, seconds):
+        self.set_status(f"Sleeping {seconds}s...")
+        time.sleep(float(seconds))
+
+    def resolve_shared_vars(self, names: list[str]) -> dict[str, str] | None:
+        prompt = MultiFieldPrompt(self.root, "Shared Variables", names)
+        values = prompt.show()
+        if values is None:
+            self.set_status("Chain cancelled.")
+            return None
+        return values
+
     def run_chain(self, steps, source="chain") -> None:
         if not isinstance(steps, (list, tuple)) or not steps:
             raise TVMError("Chain command requires a non-empty list of steps.")
 
         total = len(steps)
+        shared_vars: dict[str, str] = {}
 
         for index, step in enumerate(steps, start=1):
             if not isinstance(step, (list, tuple)) or not step:
                 raise TVMError(f"Invalid chain step: {step!r}")
 
             step_kind = step[0]
+
+            if step_kind == "vars":
+                if len(step) < 2 or not isinstance(step[1], (list, tuple)):
+                    raise TVMError("vars step requires a list of variable names.")
+                names = [str(name) for name in step[1]]
+                self.set_status(f"Chain step {index}/{total}: shared vars")
+                values = self.resolve_shared_vars(names)
+                if values is None:
+                    return
+                shared_vars.update(values)
+                continue
 
             if step_kind == "sleep":
                 if len(step) < 2:
@@ -715,12 +715,12 @@ class TVMApp:
 
             step_type, step_cmd, step_options = parse_command_entry(step)
             self.set_status(f"Chain step {index}/{total}: {step_cmd}")
-            self.run_cmd(step_type, step_cmd, step_options, None, record_history=False)
+            self.run_cmd(step_type, step_cmd, step_options, None, record_history=False, shared_vars=shared_vars)
 
         self.add_history_entry("chain", f"{total} steps", source=source)
         self.set_status(f"Chain complete: {total} step(s).")
 
-    def run_cmd(self, cmd_type, cmd, options=None, current_window=None, record_history: bool = True) -> None:
+    def run_cmd(self, cmd_type, cmd, options=None, current_window=None, record_history: bool = True, shared_vars: dict[str, str] | None = None) -> None:
         try:
             if options is None:
                 options = {}
@@ -734,7 +734,7 @@ class TVMApp:
 
             resolved_cmd = cmd
             if normalized in (1, 2, 3, "spawn", "command", "send", "detached") and isinstance(cmd, str):
-                resolved_cmd = self.resolve_command_placeholders(cmd)
+                resolved_cmd = self.resolve_command_placeholders(cmd, shared_vars=shared_vars)
                 if resolved_cmd is None:
                     return
             if not self.confirm_command(normalized, resolved_cmd, options):
@@ -868,8 +868,7 @@ class TVMApp:
             btn.pack(pady=2)
             self.category_buttons[category] = btn
 
-        Button(frame, text="History", width=28, bg="#4b3869", fg="white", command=self.open_history_window).pack(pady=(8, 2))
-        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=2)
+        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=(8, 2))
         Button(frame, text="Forget Saved Window", width=28, bg="#7f6000", fg="white", command=self.forget_saved_window).pack(pady=2)
         Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=2)
         Button(frame, text="Plugin Browser", width=28, bg="purple", fg="white", command=self.open_plugin_browser).pack(pady=2)
