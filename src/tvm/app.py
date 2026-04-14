@@ -10,27 +10,13 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from tkinter import (
-    BOTH,
-    END,
-    LEFT,
-    RIGHT,
-    X,
-    Y,
-    Button,
-    Entry,
-    Frame,
-    Label,
-    Listbox,
-    Scrollbar,
-    StringVar,
-    Text,
-    Tk,
-    Toplevel,
-    messagebox,
+    BOTH, END, LEFT, RIGHT, X, Y,
+    Button, Entry, Frame, Label, Listbox, Scrollbar,
+    StringVar, Text, Tk, Toplevel, messagebox,
 )
 
 APP_NAME = "TVM"
-APP_VERSION = "0.2.9"
+APP_VERSION = "0.3.0"
 PLUGIN_API_VERSION = 1
 MAX_HISTORY = 30
 
@@ -287,10 +273,7 @@ class TVMApp:
                 metadata = self._read_plugin_metadata(module, file)
                 setattr(module, "__tvm_metadata__", metadata)
                 if not metadata["compatible"]:
-                    raise TVMError(
-                        f"Unsupported plugin API version {metadata['api_version']}. "
-                        f"This TVM build supports API {PLUGIN_API_VERSION}."
-                    )
+                    raise TVMError(f"Unsupported plugin API version {metadata['api_version']}. This TVM build supports API {PLUGIN_API_VERSION}.")
                 if not metadata["has_run"]:
                     raise TVMError("Plugin does not define run(app, context).")
                 plugins[name] = module
@@ -448,22 +431,18 @@ class TVMApp:
         win.title("Command History")
         win.geometry("900x420")
         win.protocol("WM_DELETE_WINDOW", win.destroy)
-
         outer = Frame(win, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
         Label(outer, text="Recent Commands", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
-
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)
         left = Frame(body); left.pack(side=LEFT, fill=Y)
         right = Frame(body); right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
-
         listbox = Listbox(left, width=44, height=18)
         listbox.pack(side=LEFT, fill=Y)
         scrollbar = Scrollbar(left, command=listbox.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         listbox.config(yscrollcommand=scrollbar.set)
-
         info = Text(right, wrap="word", width=72, height=20)
         info.pack(fill=BOTH, expand=True)
         selected_entry = {"value": None}
@@ -513,7 +492,6 @@ class TVMApp:
         Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
         Button(buttons, text="Clear History", command=clear_history, bg="#7f6000", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
         Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
-
         listbox.bind("<<ListboxSelect>>", show_selected)
         refresh()
 
@@ -644,23 +622,41 @@ class TVMApp:
     def send_text_to_window(self, text: str) -> None:
         self.send_to_selected_window(text)
 
-    def spawn_terminal(self, cmd: str) -> None:
-        self.add_history_entry(1, cmd, source="spawn")
+    def spawn_terminal(self, cmd: str, record_history: bool = True) -> None:
+        if record_history:
+            self.add_history_entry(1, cmd, source="spawn")
         self.set_status(f"Spawning new terminal command: {cmd}")
         subprocess.Popen([self.application, "--", "bash", "-lc", cmd])
 
-    def run_detached(self, cmd: str) -> None:
-        self.add_history_entry(3, cmd, source="detached")
+    def run_detached(self, cmd: str, record_history: bool = True) -> None:
+        if record_history:
+            self.add_history_entry(3, cmd, source="detached")
         self.set_status(f"Running detached command: {cmd}")
         subprocess.Popen(cmd, shell=True)
 
-    def run_cmd(self, cmd_type, cmd, options=None, current_window=None) -> None:
+    def run_chain(self, steps, source="chain") -> None:
+        if not isinstance(steps, (list, tuple)) or not steps:
+            raise TVMError("Chain command requires a non-empty list of steps.")
+        total = len(steps)
+        for index, step in enumerate(steps, start=1):
+            step_type, step_cmd, step_options = parse_command_entry(step)
+            self.set_status(f"Chain step {index}/{total}: {step_cmd}")
+            self.run_cmd(step_type, step_cmd, step_options, None, record_history=False)
+        self.add_history_entry("chain", f"{total} steps", source=source)
+        self.set_status(f"Chain complete: {total} step(s).")
+
+    def run_cmd(self, cmd_type, cmd, options=None, current_window=None, record_history: bool = True) -> None:
         try:
             if options is None:
                 options = {}
             normalized = cmd_type
             if isinstance(cmd_type, str):
                 normalized = cmd_type.strip().lower()
+
+            if normalized == "chain":
+                self.run_chain(cmd, source="chain")
+                return
+
             resolved_cmd = cmd
             if normalized in (1, 2, 3, "spawn", "command", "send", "detached") and isinstance(cmd, str):
                 resolved_cmd = self.resolve_command_placeholders(cmd)
@@ -672,11 +668,11 @@ class TVMApp:
             if normalized == 0 or normalized == "select":
                 self.select_target_window()
             elif normalized == 1 or normalized == "spawn":
-                self.spawn_terminal(str(resolved_cmd))
+                self.spawn_terminal(str(resolved_cmd), record_history=record_history)
             elif normalized == 2 or normalized == "command" or normalized == "send":
                 self.send_to_selected_window(str(resolved_cmd))
             elif normalized == 3 or normalized == "detached":
-                self.run_detached(str(resolved_cmd))
+                self.run_detached(str(resolved_cmd), record_history=record_history)
             elif normalized == "plugin":
                 self.run_plugin(cmd)
             else:
@@ -707,6 +703,8 @@ class TVMApp:
                 continue
             if isinstance(cmd, str) and q in cmd.lower():
                 return True
+            if isinstance(cmd, (list, tuple)) and q in json.dumps(cmd).lower():
+                return True
         return False
 
     def update_category_filter(self, *_args) -> None:
@@ -735,8 +733,7 @@ class TVMApp:
                 text_parts = [category, subcategory]
                 try:
                     _cmd_type, cmd, _options = parse_command_entry(entry)
-                    if isinstance(cmd, str):
-                        text_parts.append(cmd)
+                    text_parts.append(json.dumps(cmd) if not isinstance(cmd, str) else cmd)
                 except Exception:
                     pass
                 if q in " ".join(text_parts).lower():
