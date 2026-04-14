@@ -30,8 +30,9 @@ from tkinter import (
 )
 
 APP_NAME = "TVM"
-APP_VERSION = "0.2.8"
+APP_VERSION = "0.2.9"
 PLUGIN_API_VERSION = 1
+MAX_HISTORY = 30
 
 CONFIG_DIR = Path.home() / ".config" / "tvm"
 CONFIG_FILE = CONFIG_DIR / "config.py"
@@ -155,6 +156,7 @@ class TVMApp:
 
         self.window_id: int | str | None = None
         self.last_window_id: int | str | None = None
+        self.command_history: list[dict] = []
         self.plugins: dict[str, object] = {}
         self.plugin_mtimes: dict[str, float] = {}
         self.plugin_errors: dict[str, str] = {}
@@ -184,17 +186,24 @@ class TVMApp:
 
     def load_state(self) -> None:
         self.last_window_id = None
+        self.command_history = []
         if not STATE_FILE.exists():
             return
         try:
             data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
             self.last_window_id = data.get("last_window_id")
+            history = data.get("command_history", [])
+            if isinstance(history, list):
+                self.command_history = history[:MAX_HISTORY]
         except Exception as exc:
             self.log(f"Could not load state file: {exc}")
 
     def save_state(self) -> None:
         try:
-            payload = {"last_window_id": self.window_id if self.window_id is not None else self.last_window_id}
+            payload = {
+                "last_window_id": self.window_id if self.window_id is not None else self.last_window_id,
+                "command_history": self.command_history[:MAX_HISTORY],
+            }
             STATE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         except Exception as exc:
             self.log(f"Could not save state file: {exc}")
@@ -202,6 +211,18 @@ class TVMApp:
     def remember_window(self, window_id) -> None:
         self.window_id = window_id
         self.last_window_id = window_id
+        self.save_state()
+
+    def add_history_entry(self, action_type, command_text, source="manual") -> None:
+        entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "action_type": str(action_type),
+            "command": str(command_text),
+            "window_id": self.window_id,
+            "source": source,
+        }
+        self.command_history.insert(0, entry)
+        self.command_history = self.command_history[:MAX_HISTORY]
         self.save_state()
 
     def on_close(self) -> None:
@@ -419,7 +440,82 @@ class TVMApp:
             raise TVMError(f"Plugin '{plugin_name}' does not define run(app, context).")
         context = {"window_id": self.window_id, "config": self.cfg, "plugin_dir": PLUGIN_DIR, "args": plugin_args.get("args", plugin_args), "app_version": APP_VERSION, "plugin_api_version": PLUGIN_API_VERSION}
         self.set_status(f"Running plugin: {plugin_name}")
+        self.add_history_entry("plugin", plugin_name, source="plugin")
         run_fn(self, context)
+
+    def open_history_window(self) -> None:
+        win = Toplevel(self.root)
+        win.title("Command History")
+        win.geometry("900x420")
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+
+        outer = Frame(win, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+        Label(outer, text="Recent Commands", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
+        body = Frame(outer)
+        body.pack(fill=BOTH, expand=True)
+        left = Frame(body); left.pack(side=LEFT, fill=Y)
+        right = Frame(body); right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
+
+        listbox = Listbox(left, width=44, height=18)
+        listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        listbox.config(yscrollcommand=scrollbar.set)
+
+        info = Text(right, wrap="word", width=72, height=20)
+        info.pack(fill=BOTH, expand=True)
+        selected_entry = {"value": None}
+
+        def refresh() -> None:
+            listbox.delete(0, END)
+            for entry in self.command_history:
+                label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
+                listbox.insert(END, label)
+            info.delete("1.0", END)
+            info.insert("1.0", "Select a history entry to inspect or rerun.\n")
+
+        def show_selected(_event=None) -> None:
+            idxs = listbox.curselection()
+            if not idxs:
+                return
+            entry = self.command_history[idxs[0]]
+            selected_entry["value"] = entry
+            lines = [
+                f"Time: {entry.get('timestamp','')}",
+                f"Action: {entry.get('action_type','')}",
+                f"Source: {entry.get('source','')}",
+                f"Window ID: {entry.get('window_id','')}",
+                "",
+                "Command:",
+                entry.get("command",""),
+            ]
+            info.delete("1.0", END)
+            info.insert("1.0", "\n".join(lines))
+
+        def rerun_selected() -> None:
+            entry = selected_entry["value"]
+            if not entry:
+                self.set_status("Select a history entry first.")
+                return
+            self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
+
+        def clear_history() -> None:
+            if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
+                return
+            self.command_history = []
+            self.save_state()
+            refresh()
+            self.set_status("Command history cleared.")
+
+        buttons = Frame(outer); buttons.pack(fill=X, pady=(8, 0))
+        Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
+        Button(buttons, text="Clear History", command=clear_history, bg="#7f6000", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
+        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
+
+        listbox.bind("<<ListboxSelect>>", show_selected)
+        refresh()
 
     def resolve_command_placeholders(self, cmd: str):
         if not isinstance(cmd, str):
@@ -538,6 +634,7 @@ class TVMApp:
             result = self._run_helper({"action": "send", "window_id": self.window_id, "text": cmd, "key": "Return", "focus_delay_ms": 150})
             active_window = result.get("active_window")
             self.remember_window(self.window_id)
+            self.add_history_entry(2, cmd, source="send")
             self.set_status(f"Sent to selected window {self.window_id} (active {active_window}).")
         except TVMError as exc:
             logging.warning("Send failed for window %s: %s", self.window_id, exc)
@@ -548,10 +645,12 @@ class TVMApp:
         self.send_to_selected_window(text)
 
     def spawn_terminal(self, cmd: str) -> None:
+        self.add_history_entry(1, cmd, source="spawn")
         self.set_status(f"Spawning new terminal command: {cmd}")
         subprocess.Popen([self.application, "--", "bash", "-lc", cmd])
 
     def run_detached(self, cmd: str) -> None:
+        self.add_history_entry(3, cmd, source="detached")
         self.set_status(f"Running detached command: {cmd}")
         subprocess.Popen(cmd, shell=True)
 
@@ -697,7 +796,8 @@ class TVMApp:
             btn.pack(pady=2)
             self.category_buttons[category] = btn
 
-        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=(8, 2))
+        Button(frame, text="History", width=28, bg="#4b3869", fg="white", command=self.open_history_window).pack(pady=(8, 2))
+        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=2)
         Button(frame, text="Forget Saved Window", width=28, bg="#7f6000", fg="white", command=self.forget_saved_window).pack(pady=2)
         Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=2)
         Button(frame, text="Plugin Browser", width=28, bg="purple", fg="white", command=self.open_plugin_browser).pack(pady=2)
