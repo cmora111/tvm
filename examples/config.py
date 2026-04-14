@@ -25,6 +25,20 @@ Categories = {
     },
 
     'Admin_CMDs': {
+        'Deploy': ['chain', [
+            ['select_profile', 'server'],
+            [2, 'cd <path>'],
+            ['sleep', 1],
+            [2, 'git pull'],
+            ['sleep', 1],
+            [2, 'systemctl restart myservice', {'confirm': True}],
+        ]],
+
+        'Logs': ['chain', [
+            ['select_profile', 'logs'],
+            [2, 'tail -f /var/log/syslog'],
+        ]],
+
         'ls': [2, 'ls'],
         'ps': [2, 'ps axwwl'],
         'pwd': [2, 'pwd'],
@@ -42,6 +56,23 @@ Categories = {
     'Plugins': {
         'Hello World Plugin': ['plugin', 'hello_world'],
     },
+
+    'Chain CMDs': {
+        'Quick Test': ['chain', [
+            [2, 'pwd'],
+            [2, 'ls']
+        ]],
+
+        'SSH Prep': ['chain', [
+            [2, 'cd <path>'],
+            [2, 'ssh <user>@<host>'],
+        ]],
+
+        'Danger Chain': ['chain', [
+            [2, 'echo starting'],
+            [2, 'sudo apt upgrade -y', {'confirm': True}],
+        ]]
+    }
 }
 Favorites = [
     ["Admin_CMDs", "ls"],
@@ -49,3 +80,4 @@ Favorites = [
     ["Admin_CMDs", "ssh"],
     ["Plugins", "Hello World Plugin"],
 ]
+

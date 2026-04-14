@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import importlib.util
 import json
 import logging
@@ -211,6 +212,54 @@ class TVMApp:
         self.command_history = self.command_history[:MAX_HISTORY]
         self.save_state()
 
+    def select_profile(self, name):
+        windows = getattr(self.cfg, "Windows", None)
+
+        if windows is None or not isinstance(windows, dict):
+            windows = {}
+            setattr(self.cfg, "Windows", windows)
+
+        saved = windows.get(name)
+
+        if saved and self.validate_window_id(saved):
+            self.window_id = saved
+            self.set_status(f"Using profile '{name}' -> {saved}")
+            return
+
+        self.set_status(f"Select window for profile '{name}'")
+        self.select_target_window()
+
+        windows[name] = self.window_id
+
+        try:
+            import pprint
+            import re
+
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                text = f.read()
+
+            new_windows = pprint.pformat(windows, indent=4)
+
+            if re.search(r"(?m)^Windows\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Windows = {new_windows}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nWindows = {new_windows}\n"
+
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                f.write(text)
+
+        except Exception as e:
+            self.log(f"Could not persist window profile: {e}")
+
+
+    def run_sleep(self, seconds):
+        self.set_status(f"Sleeping {seconds}s...")
+        time.sleep(float(seconds))
+
     def on_close(self) -> None:
         self.save_state()
         self.log("Shutting down TVM")
@@ -280,11 +329,11 @@ class TVMApp:
                 mtimes[name] = mtime
             except Exception as exc:
                 errors[name] = str(exc)
-        self.plugins = plugins
-        self.plugin_mtimes = mtimes
-        self.plugin_errors = errors
-        self.log(f"Plugins loaded: {len(self.plugins)} ok, {len(self.plugin_errors)} errors")
-        return self.plugins
+            self.plugins = plugins
+            self.plugin_mtimes = mtimes
+            self.plugin_errors = errors
+            self.log(f"Plugins loaded: {len(self.plugins)} ok, {len(self.plugin_errors)} errors")
+            return self.plugins
 
     def reload_plugins_with_notice(self) -> None:
         old_names = set(self.plugins)
@@ -346,43 +395,43 @@ class TVMApp:
         Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
         snapshot = []
 
-        def refresh_list() -> None:
-            self.load_plugins(force=False)
-            listbox.delete(0, END)
-            snapshot.clear()
-            snapshot.extend(self.get_plugin_snapshot())
-            for item in snapshot:
-                prefix = "✓" if item["status"] == "loaded" else "✗"
-                listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
-            info.delete("1.0", END)
-            info.insert("1.0", "Select a plugin to inspect.\n")
-            status_var.set(f"{len(snapshot)} plugin file(s) found.")
+    def refresh_list() -> None:
+        self.load_plugins(force=False)
+        listbox.delete(0, END)
+        snapshot.clear()
+        snapshot.extend(self.get_plugin_snapshot())
+        for item in snapshot:
+            prefix = "✓" if item["status"] == "loaded" else "✗"
+            listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
+        info.delete("1.0", END)
+        info.insert("1.0", "Select a plugin to inspect.\n")
+        status_var.set(f"{len(snapshot)} plugin file(s) found.")
 
-        def show_selected(_event=None) -> None:
-            idxs = listbox.curselection()
-            if not idxs:
-                return
-            item = snapshot[idxs[0]]
-            lines = [
-                f"Name: {item['display_name']}",
-                f"Internal name: {item['name']}",
-                f"Status: {item['status']}",
-                f"Plugin version: {item['plugin_version']}",
-                f"Plugin API version: {item['api_version']}",
-                f"Compatible with TVM: {item['compatible']}",
-                f"Path: {item['path']}",
-                f"Last modified: {item['mtime']}",
-                "",
-            ]
-            if item["description"]:
-                lines.extend(["Description:", item["description"], ""])
-            if item["error"]:
-                lines.extend(["Load error:", item["error"], ""])
-            if item["status"] == "loaded":
-                lines.extend(["Expected entry point:", "def run(app, context): ...", "", "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version"])
-            info.delete("1.0", END)
-            info.insert("1.0", "\n".join(lines))
-            status_var.set(f"Viewing: {item['display_name']}")
+    def show_selected(_event=None) -> None:
+        idxs = listbox.curselection()
+        if not idxs:
+            return
+        item = snapshot[idxs[0]]
+        lines = [
+            f"Name: {item['display_name']}",
+            f"Internal name: {item['name']}",
+            f"Status: {item['status']}",
+            f"Plugin version: {item['plugin_version']}",
+            f"Plugin API version: {item['api_version']}",
+            f"Compatible with TVM: {item['compatible']}",
+            f"Path: {item['path']}",
+            f"Last modified: {item['mtime']}",
+            "",
+        ]
+        if item["description"]:
+            lines.extend(["Description:", item["description"], ""])
+        if item["error"]:
+            lines.extend(["Load error:", item["error"], ""])
+        if item["status"] == "loaded":
+            lines.extend(["Expected entry point:", "def run(app, context): ...", "", "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version"])
+        info.delete("1.0", END)
+        info.insert("1.0", "\n".join(lines))
+        status_var.set(f"Viewing: {item['display_name']}")
 
         buttons = Frame(outer); buttons.pack(fill=X, pady=(8, 0))
         Button(buttons, text="Reload", command=refresh_list, bg="navy", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
@@ -447,46 +496,46 @@ class TVMApp:
         info.pack(fill=BOTH, expand=True)
         selected_entry = {"value": None}
 
-        def refresh() -> None:
-            listbox.delete(0, END)
-            for entry in self.command_history:
-                label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
-                listbox.insert(END, label)
-            info.delete("1.0", END)
-            info.insert("1.0", "Select a history entry to inspect or rerun.\n")
+    def refresh() -> None:
+        listbox.delete(0, END)
+        for entry in self.command_history:
+            label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
+            listbox.insert(END, label)
+        info.delete("1.0", END)
+        info.insert("1.0", "Select a history entry to inspect or rerun.\n")
 
-        def show_selected(_event=None) -> None:
-            idxs = listbox.curselection()
-            if not idxs:
-                return
-            entry = self.command_history[idxs[0]]
-            selected_entry["value"] = entry
-            lines = [
-                f"Time: {entry.get('timestamp','')}",
-                f"Action: {entry.get('action_type','')}",
-                f"Source: {entry.get('source','')}",
-                f"Window ID: {entry.get('window_id','')}",
-                "",
-                "Command:",
-                entry.get("command",""),
-            ]
-            info.delete("1.0", END)
-            info.insert("1.0", "\n".join(lines))
+    def show_selected(_event=None) -> None:
+        idxs = listbox.curselection()
+        if not idxs:
+            return
+        entry = self.command_history[idxs[0]]
+        selected_entry["value"] = entry
+        lines = [
+            f"Time: {entry.get('timestamp','')}",
+            f"Action: {entry.get('action_type','')}",
+            f"Source: {entry.get('source','')}",
+            f"Window ID: {entry.get('window_id','')}",
+            "",
+            "Command:",
+            entry.get("command",""),
+        ]
+        info.delete("1.0", END)
+        info.insert("1.0", "\n".join(lines))
 
-        def rerun_selected() -> None:
-            entry = selected_entry["value"]
-            if not entry:
-                self.set_status("Select a history entry first.")
-                return
-            self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
+    def rerun_selected() -> None:
+        entry = selected_entry["value"]
+        if not entry:
+            self.set_status("Select a history entry first.")
+            return
+        self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
 
-        def clear_history() -> None:
-            if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
-                return
-            self.command_history = []
-            self.save_state()
-            refresh()
-            self.set_status("Command history cleared.")
+    def clear_history() -> None:
+        if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
+            return
+        self.command_history = []
+        self.save_state()
+        refresh()
+        self.set_status("Command history cleared.")
 
         buttons = Frame(outer); buttons.pack(fill=X, pady=(8, 0))
         Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
@@ -524,6 +573,10 @@ class TVMApp:
             msg += f"\nTarget window: {self.window_id}"
         return messagebox.askokcancel("Confirm Command", msg)
 
+    def run_sleep(self, seconds):
+        self.set_status(f"Sleeping {seconds}s...")
+        time.sleep(float(seconds))
+
     def _run_helper(self, payload: dict) -> dict:
         command = [sys.executable, "-m", "tvm.xdo_helper"]
         self.log(f"Running helper action={payload.get('action')} payload={payload}")
@@ -545,8 +598,8 @@ class TVMApp:
             result = json.loads(stdout)
         except json.JSONDecodeError as exc:
             raise TVMError(f"Helper returned invalid JSON: {stdout!r}") from exc
-        if result.get("status") != "ok":
-            raise TVMError(result.get("error", "Helper reported an unknown error."))
+            if result.get("status") != "ok":
+                raise TVMError(result.get("error", "Helper reported an unknown error."))
         return result
 
     def validate_window_id(self, window_id) -> bool:
@@ -637,11 +690,33 @@ class TVMApp:
     def run_chain(self, steps, source="chain") -> None:
         if not isinstance(steps, (list, tuple)) or not steps:
             raise TVMError("Chain command requires a non-empty list of steps.")
+
         total = len(steps)
+
         for index, step in enumerate(steps, start=1):
+            if not isinstance(step, (list, tuple)) or not step:
+                raise TVMError(f"Invalid chain step: {step!r}")
+
+            step_kind = step[0]
+
+            if step_kind == "sleep":
+                if len(step) < 2:
+                    raise TVMError("Sleep step requires a number of seconds.")
+                self.set_status(f"Chain step {index}/{total}: sleep {step[1]}")
+                self.run_sleep(step[1])
+                continue
+
+            if step_kind == "select_profile":
+                if len(step) < 2:
+                    raise TVMError("select_profile step requires a profile name.")
+                self.set_status(f"Chain step {index}/{total}: select profile {step[1]}")
+                self.select_profile(step[1])
+                continue
+
             step_type, step_cmd, step_options = parse_command_entry(step)
             self.set_status(f"Chain step {index}/{total}: {step_cmd}")
             self.run_cmd(step_type, step_cmd, step_options, None, record_history=False)
+
         self.add_history_entry("chain", f"{total} steps", source=source)
         self.set_status(f"Chain complete: {total} step(s).")
 
