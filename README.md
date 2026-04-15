@@ -1,164 +1,80 @@
-# TVM — Terminal Virtual Macropad
+🖥️ TVM — Terminal Virtual Macropad
+<p align="center"> <b>A programmable macro pad for controlling terminal windows on Linux (X11)</b> </p> <p align="center"> <a href="https://pypi.org/project/tvm/"> <img src="https://img.shields.io/pypi/v/tvm.svg"> </a> <a href="https://pypi.org/project/tvm/"> <img src="https://img.shields.io/pypi/pyversions/tvm.svg"> </a> <a href="https://github.com/cmora111/tvm/blob/main/LICENSE"> <img src="https://img.shields.io/github/license/cmora111/tvm.svg"> </a> <a href="https://github.com/cmora111/tvm/commits/main"> <img src="https://img.shields.io/github/last-commit/cmora111/tvm.svg"> </a> <a href="#installation"> <img src="https://img.shields.io/badge/install-pip%20-e-blue"> </a> </p>
+<p align="center"> Build powerful terminal automations with chains, variables, profiles, and plugins. </p>
+📸 Preview
+<p align="center"> <img src="docs/main.png" width="600"> </p>
+⚡ Why TVM?
+<p align="center">
+Feature	What it gives you
+🔗 Chains	Automate multi-step workflows
+🔁 Shared Variables	Prompt once, reuse everywhere
+🎯 Window Profiles	Target specific terminals
+⏱️ Delays	Precise execution timing
+🧩 Plugins	Extend functionality
+⭐ Favorites	One-click access to key commands
+📜 History	Rerun previous commands instantly
+</p>
+🚀 Quick Example
+'Deploy': ['chain', [
+    ['vars', ['path', 'user', 'host']],
+    ['select_profile', 'server'],
+    [2, 'cd <path>'],
+    ['sleep', 1],
+    [2, 'git pull'],
+    ['sleep', 1],
+    [2, 'ssh -T <user>@<host>'],
+]]
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Platform](https://img.shields.io/badge/platform-linux%20\(Xorg\)-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-alpha-orange)
+👉 Prompts once → runs full deployment workflow
 
-TVM is a lightweight **Tkinter-based command launcher** for Linux (Xorg) that lets you send commands directly to any terminal window or spawn new ones.
+🧠 What TVM Really Is
 
-It acts like a **virtual macropad for your terminal**.
+Not just a macro pad —
+a lightweight terminal automation engine with a UI.
 
----
-
-## 📸 Screenshots
-
-### Main Window
-
-![Main](docs/main.png)
-
-### Admin Commands
-
-![Admin](docs/main_and_Admin_CMDs.png)
-
-### Applications
-
-![Apps](docs/main_and_Aplications.png)
-
-### APT Commands
-
-![APT](docs/main_and_APT_CMDs.png)
-
-### VI Commands
-
-![VI](docs/main_and_Vi_CMDs.png)
-
----
-
-## ✨ Features
-
-* 🖱️ Select any X11 window as a command target
-* ⌨️ Send commands directly into an existing terminal
-* 🧩 Plugin system with hot reload
-* 🧠 Smart placeholders like `<path>`, `<user>`, `<host>`
-* 🔐 Optional confirmation for dangerous commands
-* 📂 Organized categories and subcommands
-* 📊 Status bar feedback
-
----
-
-## 📦 Installation
-
-```bash
-git clone https://github.com/cmora111/tvm
+🔧 Installation
+git clone https://github.com/cmora111/tvm.git
 cd tvm
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-```
-
-Run:
-
-```bash
-tvm
-# or
 python -m tvm
-```
+📁 Project Structure
+src/tvm/
+    app.py
+    cli.py
+    xdo_helper.py
+    default_config.py
 
----
+examples/
+    config.py
+    plugins/
+⚠️ Requirements
+Linux (X11 — not Wayland)
+xdotool
+sudo apt install xdotool
+🧩 Plugin Example
+TVM_PLUGIN_API_VERSION = 1
 
-## 🧰 Requirements
-
-```bash
-sudo apt install xdotool x11-utils
-```
-
----
-
-## 🚀 Usage
-
-1. Select a target window
-2. Click a command
-3. Done
-
----
-
-## 🧠 Placeholders
-
-```bash
-cd <path>
-ssh <user>@<host>
-```
-
-TVM prompts you automatically.
-
----
-
-## 🔐 Confirmation Example
-
-```python
-'Danger Upgrade': [2, 'sudo apt upgrade -y', {'confirm': True}]
-```
-
----
-
-## ⚙️ Configuration
-
-```bash
-~/.config/tvm/config.py
-```
-
-See `examples/config.py`.
-
----
-
-## 🔌 Plugins
-
-Location:
-
-```bash
-~/.config/tvm/plugins/
-```
-
-Example:
-
-```python
 def run(app, context):
-    app.send_text_to_window('echo "Hello from plugin!"')
-```
-
----
-
-## ⚠️ Notes
-
-* Requires **Xorg (not Wayland)**
-* Uses `xdotool` + `xwininfo`
-
----
-
-## 🧼 Cleanup
-
-See `CLEANUP.md`
-
----
-
-## 📌 Roadmap
-
-* Multi-field input form
-* Command search
-* Favorites
-* Config editor UI
-
----
-
-## 📄 License
+    app.set_status("Hello from plugin!")
+📜 License
 
 MIT
 
----
+💡 Pro Tip
 
-## 🙌 Author
+If you find yourself repeating terminal tasks…
 
-Carlos Mora
-https://github.com/cmora111
+TVM turns them into one-click workflows.
 
+🔥 Optional next upgrade
+
+If you want to take this even further visually:
+
+👉 I can add:
+
+animated GIF demo (huge impact)
+dark/light themed screenshots
+“architecture diagram”
+PyPI + GitHub release automation
