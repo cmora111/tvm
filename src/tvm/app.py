@@ -346,163 +346,6 @@ class TVMApp:
         self.add_history_entry("plugin", plugin_name, source="plugin")
         run_fn(self, context)
 
-    def get_plugin_snapshot(self) -> list[dict]:
-        snapshot = []
-        names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
-        for name in names:
-            file = PLUGIN_DIR / f"{name}.py"
-            mtime = "unknown"
-            if file.exists():
-                mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-            if name in self.plugins:
-                meta = getattr(self.plugins[name], "__tvm_metadata__", {})
-                snapshot.append({
-                    "display_name": meta.get("display_name", name),
-                    "name": name,
-                    "status": "loaded",
-                    "plugin_version": meta.get("plugin_version", "0.1.0"),
-                    "api_version": meta.get("api_version", PLUGIN_API_VERSION),
-                    "compatible": meta.get("compatible", True),
-                    "description": meta.get("description", ""),
-                    "path": str(file),
-                    "mtime": mtime,
-                    "error": "",
-                })
-            else:
-                snapshot.append({
-                    "display_name": name,
-                    "name": name,
-                    "status": "error",
-                    "plugin_version": "unknown",
-                    "api_version": "unknown",
-                    "compatible": False,
-                    "description": "",
-                    "path": str(file),
-                    "mtime": mtime,
-                    "error": self.plugin_errors.get(name, "Unknown plugin load error."),
-                })
-        return snapshot
-
-
-    def open_plugin_browser(self) -> None:
-        self.load_plugins(force=False)
-        win = Toplevel(self.root)
-        win.title("Plugin Browser")
-        win.geometry("900x420")
-        win.protocol("WM_DELETE_WINDOW", win.destroy)
-
-        outer = Frame(win, padx=8, pady=8)
-        outer.pack(fill=BOTH, expand=True)
-
-        Label(
-            outer,
-            text=f"Plugin Browser — API v{PLUGIN_API_VERSION}",
-            bd=4,
-            width=40,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
-
-        body = Frame(outer)
-        body.pack(fill=BOTH, expand=True)
-
-        left = Frame(body)
-        left.pack(side=LEFT, fill=Y)
-
-        right = Frame(body)
-        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
-
-        listbox = Listbox(left, width=36, height=18)
-        listbox.pack(side=LEFT, fill=Y)
-
-        scrollbar = Scrollbar(left, command=listbox.yview)
-        scrollbar.pack(side=RIGHT, fill=Y)
-        listbox.config(yscrollcommand=scrollbar.set)
-
-        status_var = StringVar(value="Select a plugin to inspect.")
-        info = Text(right, wrap="word", width=72, height=20)
-        info.pack(fill=BOTH, expand=True)
-        Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
-
-        snapshot = []
-
-        def refresh_list() -> None:
-            self.load_plugins(force=False)
-            listbox.delete(0, END)
-            snapshot.clear()
-            snapshot.extend(self.get_plugin_snapshot())
-            for item in snapshot:
-                prefix = "✓" if item["status"] == "loaded" else "✗"
-                listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
-            info.delete("1.0", END)
-            info.insert("1.0", "Select a plugin to inspect.\n")
-            status_var.set(f"{len(snapshot)} plugin file(s) found.")
-
-        def show_selected(_event=None) -> None:
-            idxs = listbox.curselection()
-            if not idxs:
-                return
-            item = snapshot[idxs[0]]
-            lines = [
-                f"Name: {item['display_name']}",
-                f"Internal name: {item['name']}",
-                f"Status: {item['status']}",
-                f"Plugin version: {item['plugin_version']}",
-                f"Plugin API version: {item['api_version']}",
-                f"Compatible with TVM: {item['compatible']}",
-                f"Path: {item['path']}",
-                f"Last modified: {item['mtime']}",
-                "",
-            ]
-            if item["description"]:
-                lines.extend(["Description:", item["description"], ""])
-            if item["error"]:
-                lines.extend(["Load error:", item["error"], ""])
-            if item["status"] == "loaded":
-                lines.extend([
-                    "Expected entry point:",
-                    "def run(app, context): ...",
-                    "",
-                    "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version",
-                ])
-            info.delete("1.0", END)
-            info.insert("1.0", "\n".join(lines))
-            status_var.set(f"Viewing: {item['display_name']}")
-
-        buttons = Frame(outer)
-        buttons.pack(fill=X, pady=(8, 0))
-
-        Button(
-            buttons,
-            text="Reload",
-            command=refresh_list,
-            bg="navy",
-            fg="white",
-            width=16,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            buttons,
-            text="Open Plugin Folder",
-            command=self.open_plugin_folder,
-            bg="darkgreen",
-            fg="white",
-            width=16,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            buttons,
-            text="Close",
-            command=win.destroy,
-            bg="red",
-            fg="black",
-            width=16,
-        ).pack(side=RIGHT)
-
-        listbox.bind("<<ListboxSelect>>", show_selected)
-        refresh_list()
-
     def resolve_command_placeholders(self, cmd: str, shared_vars: dict[str, str] | None = None):
         if not isinstance(cmd, str):
             return cmd
@@ -835,6 +678,163 @@ class TVMApp:
     def clear_search(self) -> None:
         self.search_var.set("")
         self.update_category_filter()
+
+    def get_plugin_snapshot(self) -> list[dict]:
+        snapshot = []
+        names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
+        for name in names:
+            file = PLUGIN_DIR / f"{name}.py"
+            mtime = "unknown"
+            if file.exists():
+                mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+            if name in self.plugins:
+                meta = getattr(self.plugins[name], "__tvm_metadata__", {})
+                snapshot.append({
+                    "display_name": meta.get("display_name", name),
+                    "name": name,
+                    "status": "loaded",
+                    "plugin_version": meta.get("plugin_version", "0.1.0"),
+                    "api_version": meta.get("api_version", PLUGIN_API_VERSION),
+                    "compatible": meta.get("compatible", True),
+                    "description": meta.get("description", ""),
+                    "path": str(file),
+                    "mtime": mtime,
+                    "error": "",
+                })
+            else:
+                snapshot.append({
+                    "display_name": name,
+                    "name": name,
+                    "status": "error",
+                    "plugin_version": "unknown",
+                    "api_version": "unknown",
+                    "compatible": False,
+                    "description": "",
+                    "path": str(file),
+                    "mtime": mtime,
+                    "error": self.plugin_errors.get(name, "Unknown plugin load error."),
+                })
+        return snapshot
+
+
+    def open_plugin_browser(self) -> None:
+        self.load_plugins(force=False)
+        win = Toplevel(self.root)
+        win.title("Plugin Browser")
+        win.geometry("900x420")
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+
+        outer = Frame(win, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text=f"Plugin Browser — API v{PLUGIN_API_VERSION}",
+            bd=4,
+            width=40,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
+        body = Frame(outer)
+        body.pack(fill=BOTH, expand=True)
+
+        left = Frame(body)
+        left.pack(side=LEFT, fill=Y)
+
+        right = Frame(body)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
+
+        listbox = Listbox(left, width=36, height=18)
+        listbox.pack(side=LEFT, fill=Y)
+
+        scrollbar = Scrollbar(left, command=listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        listbox.config(yscrollcommand=scrollbar.set)
+
+        status_var = StringVar(value="Select a plugin to inspect.")
+        info = Text(right, wrap="word", width=72, height=20)
+        info.pack(fill=BOTH, expand=True)
+        Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
+
+        snapshot = []
+
+        def refresh_list() -> None:
+            self.load_plugins(force=False)
+            listbox.delete(0, END)
+            snapshot.clear()
+            snapshot.extend(self.get_plugin_snapshot())
+            for item in snapshot:
+                prefix = "✓" if item["status"] == "loaded" else "✗"
+                listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
+            info.delete("1.0", END)
+            info.insert("1.0", "Select a plugin to inspect.\n")
+            status_var.set(f"{len(snapshot)} plugin file(s) found.")
+
+        def show_selected(_event=None) -> None:
+            idxs = listbox.curselection()
+            if not idxs:
+                return
+            item = snapshot[idxs[0]]
+            lines = [
+                f"Name: {item['display_name']}",
+                f"Internal name: {item['name']}",
+                f"Status: {item['status']}",
+                f"Plugin version: {item['plugin_version']}",
+                f"Plugin API version: {item['api_version']}",
+                f"Compatible with TVM: {item['compatible']}",
+                f"Path: {item['path']}",
+                f"Last modified: {item['mtime']}",
+                "",
+            ]
+            if item["description"]:
+                lines.extend(["Description:", item["description"], ""])
+            if item["error"]:
+                lines.extend(["Load error:", item["error"], ""])
+            if item["status"] == "loaded":
+                lines.extend([
+                    "Expected entry point:",
+                    "def run(app, context): ...",
+                    "",
+                    "Context keys: window_id, config, plugin_dir, args, app_version, plugin_api_version",
+                ])
+            info.delete("1.0", END)
+            info.insert("1.0", "\n".join(lines))
+            status_var.set(f"Viewing: {item['display_name']}")
+
+        buttons = Frame(outer)
+        buttons.pack(fill=X, pady=(8, 0))
+
+        Button(
+            buttons,
+            text="Reload",
+            command=refresh_list,
+            bg="navy",
+            fg="white",
+            width=16,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            buttons,
+            text="Open Plugin Folder",
+            command=self.open_plugin_folder,
+            bg="darkgreen",
+            fg="white",
+            width=16,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            buttons,
+            text="Close",
+            command=win.destroy,
+            bg="red",
+            fg="black",
+            width=16,
+        ).pack(side=RIGHT)
+
+        listbox.bind("<<ListboxSelect>>", show_selected)
+        refresh_list()
 
     def build_main(self) -> None:
         frame = Frame(self.root, padx=8, pady=8)
