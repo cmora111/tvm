@@ -35,6 +35,7 @@ a lightweight terminal automation engine with a UI.
 🔧 Installation
 git clone https://github.com/cmora111/TermForge.git
 cd termforge
+sudo apt install xdotool
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
