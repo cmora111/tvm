@@ -4,15 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "termforge"
-version = "0.2.4"
-description = "Terminal Virtual Macropad for Xorg terminals"
+version = "0.3.3"
+description = "Terminal workflow engine for X11 terminals"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
   { name = "Carlos Mora" }
 ]
-keywords = ["tkinter", "x11", "xdotool", "terminal", "macropad", "ubuntu"]
+keywords = [
+  "tkinter",
+  "x11",
+  "xdotool",
+  "terminal",
+  "workflow",
+  "macropad",
+  "ubuntu"
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications",
@@ -23,6 +31,16 @@ classifiers = [
   "Topic :: Utilities",
   "Topic :: System :: Shells",
   "Topic :: Desktop Environment",
+]
+
+dependencies = [
+  "pynput>=1.7.6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.1",
+  "twine>=5.1.1",
 ]
 
 [project.urls]
