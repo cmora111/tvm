@@ -1,5 +1,5 @@
-# TVM example configuration
-# Copy to: ~/.config/tvm/config.py
+# TermFore example configuration
+# Copy to: ~/.config/termforge/config.py
 
 debug = {
     'Flag': False
