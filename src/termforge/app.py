@@ -35,6 +35,11 @@ from tkinter import (
     messagebox,
 )
 
+import inspect
+
+if "tvm" in inspect.getsource(__import__(__name__)):
+    raise RuntimeError("Found forbidden reference to 'tvm' in codebase.")
+
 APP_NAME = "TermForge"
 APP_VERSION = "0.3.3"
 PLUGIN_API_VERSION = 1
@@ -44,7 +49,7 @@ CONFIG_DIR = Path.home() / ".config" / "termforge"
 CONFIG_FILE = CONFIG_DIR / "config.py"
 PLUGIN_DIR = CONFIG_DIR / "plugins"
 STATE_FILE = CONFIG_DIR / "state.json"
-LOG_FILE = CONFIG_DIR / "tvm.log"
+LOG_FILE = CONFIG_DIR / "termforge.log"
 HELPER_TIMEOUT_SECONDS = 20
 PLACEHOLDER_RE = re.compile(r"<([^<>]+)>")
 
@@ -64,7 +69,7 @@ class TermForgeError(RuntimeError):
 
 def load_config():
     if CONFIG_FILE.exists():
-        spec = importlib.util.spec_from_file_location("tvm_user_config", CONFIG_FILE)
+        spec = importlib.util.spec_from_file_location("termforge_user_config", CONFIG_FILE)
         if spec and spec.loader:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -78,7 +83,7 @@ def ensure_user_config() -> None:
         return
     from . import default_config
     lines = [
-        "# TVM user configuration",
+        "# TermForge user configuration",
         "# Edit Categories below.",
         "",
         f"terminal = {repr(getattr(default_config, 'terminal', {'application': 'gnome-terminal'}))}",
@@ -372,7 +377,7 @@ class HotkeyEditorWindow:
         self.app.set_status("Hotkeys reloaded from config.")
         self.refresh()
 
-class TVMApp:
+class TermForgeApp:
     def __init__(self, root: Tk, cfg) -> None:
         self.root = root
         self.cfg = cfg
@@ -398,7 +403,7 @@ class TVMApp:
             logging.getLogger().setLevel(logging.DEBUG)
 
         self.load_state()
-        self.log("Starting TVM")
+        self.log("Starting TermForge")
         self.load_plugins(force=True)
         self.build_main()
         self.initialize_hotkeys()
@@ -633,7 +638,7 @@ class TVMApp:
         messagebox.showinfo("Hotkeys", "\n".join(lines))
 
     def _read_plugin_metadata(self, module, file: Path) -> dict:
-        api_version = getattr(module, "TVM_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
+        api_version = getattr(module, "TermForge_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
         display_name = getattr(module, "PLUGIN_NAME", file.stem)
         plugin_version = getattr(module, "PLUGIN_VERSION", "0.1.0")
         description = getattr(module, "__doc__", "") or getattr(module, "PLUGIN_DESCRIPTION", "")
@@ -672,11 +677,11 @@ class TVMApp:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 metadata = self._read_plugin_metadata(module, file)
-                setattr(module, "__tvm_metadata__", metadata)
+                setattr(module, "__termforge_metadata__", metadata)
                 if not metadata["compatible"]:
                     raise TermForgeError(
                         f"Unsupported plugin API version {metadata['api_version']}. "
-                        f"This TVM build supports API {PLUGIN_API_VERSION}."
+                        f"This TermForge build supports API {PLUGIN_API_VERSION}."
                     )
                 if not metadata["has_run"]:
                     raise TermForgeError("Plugin does not define run(app, context).")
@@ -938,6 +943,10 @@ class TVMApp:
         if record_history:
             self.add_history_entry(2, cmd, source="send")
         self.set_status(f"Sent to selected window {self.window_id} (active {active_window}).")
+
+    def send_text_to_window(self, text: str) -> None:
+        self.send_to_selected_window(text)
+
 
     def spawn_terminal(self, cmd: str, record_history: bool = True) -> None:
         if record_history:
@@ -1356,7 +1365,7 @@ def main() -> int:
     ensure_user_config()
     cfg = load_config()
     root = Tk()
-    TVMApp(root, cfg)
+    TermForgeApp(root, cfg)
     root.mainloop()
     return 0
 
