@@ -9,15 +9,34 @@ import sys
 import time
 import traceback
 from datetime import datetime
+
+try:
+    from pynput import keyboard as pynput_keyboard
+except Exception:
+    pynput_keyboard = None
 from pathlib import Path
 from tkinter import (
-    BOTH, END, LEFT, RIGHT, X, Y,
-    Button, Entry, Frame, Label, Listbox, Scrollbar,
-    StringVar, Text, Tk, Toplevel, messagebox,
+    BOTH,
+    END,
+    LEFT,
+    RIGHT,
+    X,
+    Y,
+    Button,
+    Entry,
+    Frame,
+    Label,
+    Listbox,
+    Scrollbar,
+    StringVar,
+    Text,
+    Tk,
+    Toplevel,
+    messagebox,
 )
 
 APP_NAME = "TermForge"
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.3.3"
 PLUGIN_API_VERSION = 1
 MAX_HISTORY = 30
 
@@ -25,7 +44,7 @@ CONFIG_DIR = Path.home() / ".config" / "termforge"
 CONFIG_FILE = CONFIG_DIR / "config.py"
 PLUGIN_DIR = CONFIG_DIR / "plugins"
 STATE_FILE = CONFIG_DIR / "state.json"
-LOG_FILE = CONFIG_DIR / "termforge.log"
+LOG_FILE = CONFIG_DIR / "tvm.log"
 HELPER_TIMEOUT_SECONDS = 20
 PLACEHOLDER_RE = re.compile(r"<([^<>]+)>")
 
@@ -45,7 +64,7 @@ class TermForgeError(RuntimeError):
 
 def load_config():
     if CONFIG_FILE.exists():
-        spec = importlib.util.spec_from_file_location("termforge_user_config", CONFIG_FILE)
+        spec = importlib.util.spec_from_file_location("tvm_user_config", CONFIG_FILE)
         if spec and spec.loader:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
@@ -59,13 +78,15 @@ def ensure_user_config() -> None:
         return
     from . import default_config
     lines = [
-        "# TermForge user configuration",
+        "# TVM user configuration",
         "# Edit Categories below.",
         "",
         f"terminal = {repr(getattr(default_config, 'terminal', {'application': 'gnome-terminal'}))}",
         f"debug = {repr(getattr(default_config, 'debug', {'Flag': False}))}",
+        "Windows = {}",
+        f"Favorites = {repr(getattr(default_config, 'Favorites', [])) if hasattr(default_config, 'Favorites') else '[]'}",
+        "Hotkeys = {}",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
-        "Favorites = []",
         "",
     ]
     CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
@@ -82,7 +103,14 @@ def parse_command_entry(entry):
 
 
 class MultiFieldPrompt:
-    def __init__(self, parent, title: str, fields: list[str], defaults: dict[str, str] | None = None):
+    def __init__(
+        self,
+        parent,
+        title: str,
+        fields: list[str],
+        defaults: dict[str, str] | None = None,
+        heading: str = "Enter values",
+    ):
         self.parent = parent
         self.fields = fields
         self.defaults = defaults or {}
@@ -98,14 +126,22 @@ class MultiFieldPrompt:
         container = Frame(self.window, padx=10, pady=10)
         container.pack(fill=BOTH, expand=True)
 
-        Label(container, text="Enter command values", bd=2, relief="groove", width=28, bg="lightgreen", fg="black").pack(pady=(0, 10))
+        Label(
+            container,
+            text=heading,
+            bd=2,
+            relief="groove",
+            width=30,
+            bg="lightgreen",
+            fg="black",
+        ).pack(pady=(0, 10))
 
         self.entries: dict[str, Entry] = {}
         for field in fields:
             row = Frame(container)
             row.pack(fill=X, pady=3)
             Label(row, text=f"{field}:", width=12, anchor="w").pack(side=LEFT)
-            entry = Entry(row, width=36)
+            entry = Entry(row, width=40)
             entry.pack(side=RIGHT, fill=X, expand=True)
             entry.insert(0, self.defaults.get(field, ""))
             self.entries[field] = entry
@@ -135,9 +171,9 @@ class MultiFieldPrompt:
 
 
 class ChainRunnerWindow:
-    def __init__(self, parent, title: str, steps: list[str]):
+    def __init__(self, parent, total_steps: int):
         self.window = Toplevel(parent)
-        self.window.title(title)
+        self.window.title("Chain Runner")
         self.window.geometry("760x360")
         self.window.transient(parent)
 
@@ -146,7 +182,7 @@ class ChainRunnerWindow:
 
         Label(
             outer,
-            text=title,
+            text=f"Chain Runner — {total_steps} step(s)",
             bd=4,
             width=40,
             bg="lightgreen",
@@ -154,53 +190,189 @@ class ChainRunnerWindow:
             relief="raised",
         ).pack(pady=(0, 8))
 
-        body = Frame(outer)
-        body.pack(fill=BOTH, expand=True)
+        self.output = Text(outer, wrap="word", height=18, width=90)
+        self.output.pack(fill=BOTH, expand=True)
+        self.output.insert("end", "Chain started.\n")
+        self.output.see("end")
 
-        self.listbox = Listbox(body, width=80, height=14)
-        self.listbox.pack(side=LEFT, fill=BOTH, expand=True)
+        Button(outer, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(pady=(8, 0))
 
-        scrollbar = Scrollbar(body, command=self.listbox.yview)
+    def log(self, marker: str, message: str) -> None:
+        self.output.insert("end", f"{marker} {message}\n")
+        self.output.see("end")
+        self.output.update_idletasks()
+
+    def step_running(self, index: int, total: int, message: str) -> None:
+        self.log("[>]", f"[{index}/{total}] {message}")
+
+    def step_done(self, message: str) -> None:
+        self.log("[✓]", message)
+
+    def step_failed(self, message: str) -> None:
+        self.log("[x]", message)
+
+    def finished(self) -> None:
+        self.log("[✓]", "Chain complete.")
+
+
+
+class HotkeyEditorWindow:
+    def __init__(self, app):
+        self.app = app
+        self.window = Toplevel(app.root)
+        self.window.title("Hotkey Editor")
+        self.window.geometry("900x520")
+        self.window.transient(app.root)
+
+        outer = Frame(self.window, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text="Hotkey Editor",
+            bd=4,
+            width=32,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
+        top = Frame(outer)
+        top.pack(fill=BOTH, expand=True)
+
+        left = Frame(top)
+        left.pack(side=LEFT, fill=Y)
+
+        right = Frame(top)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(10, 0))
+
+        self.listbox = Listbox(left, width=40, height=18)
+        self.listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=self.listbox.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         self.listbox.config(yscrollcommand=scrollbar.set)
 
-        self.lines = list(steps)
-        for line in self.lines:
-            self.listbox.insert(END, f"[ ] {line}")
+        form = Frame(right)
+        form.pack(fill=X)
 
-        self.status_var = StringVar(value="Waiting to start...")
-        Label(outer, textvariable=self.status_var, anchor="w").pack(fill=X, pady=(8, 4))
-        Button(outer, text="Close", width=14, bg="red", fg="black", command=self.window.destroy).pack(anchor="e")
+        Label(form, text="Hotkey:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
+        self.hotkey_var = StringVar()
+        Entry(form, textvariable=self.hotkey_var, width=42).grid(row=0, column=1, sticky="ew", pady=3)
 
-    def _set_row(self, index: int, prefix: str, text: str):
-        if index < 0 or index >= len(self.lines):
+        Label(form, text="Category:", width=14, anchor="w").grid(row=1, column=0, sticky="w", pady=3)
+        self.category_var = StringVar()
+        self.category_entry = Entry(form, textvariable=self.category_var, width=42)
+        self.category_entry.grid(row=1, column=1, sticky="ew", pady=3)
+
+        Label(form, text="Command:", width=14, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
+        self.command_var = StringVar()
+        self.command_entry = Entry(form, textvariable=self.command_var, width=42)
+        self.command_entry.grid(row=2, column=1, sticky="ew", pady=3)
+
+        form.grid_columnconfigure(1, weight=1)
+
+        help_text = Text(right, wrap="word", height=14, width=60)
+        help_text.pack(fill=BOTH, expand=True, pady=(10, 0))
+        help_text.insert(
+            "1.0",
+            "Examples:\n"
+            "  <ctrl>+<alt>+d\n"
+            "  <ctrl>+<shift>+p\n"
+            "  <ctrl>+<alt>+l\n\n"
+            "Target format:\n"
+            "  Category = a top-level key in Categories\n"
+            "  Command = a command name inside that category\n\n"
+            "Tip: use the Search UI in the main window to verify category/command names.\n",
+        )
+        help_text.config(state="disabled")
+
+        button_row = Frame(outer)
+        button_row.pack(fill=X, pady=(10, 0))
+
+        Button(button_row, text="Load Selected", width=16, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Save Mapping", width=16, bg="darkgreen", fg="white", command=self.save_mapping).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Delete Mapping", width=16, bg="#7f6000", fg="white", command=self.delete_mapping).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Reload Hotkeys", width=16, bg="navy", fg="white", command=self.reload_hotkeys).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
+
+        self.snapshot = []
+        self.listbox.bind("<<ListboxSelect>>", self.on_select)
+        self.refresh()
+
+    def refresh(self):
+        self.snapshot.clear()
+        self.listbox.delete(0, END)
+        hotkeys = self.app.get_hotkeys_dict()
+        for hotkey, target in sorted(hotkeys.items()):
+            try:
+                category, command = self.app._normalize_hotkey_target(target)
+            except Exception:
+                category, command = "<invalid>", repr(target)
+            self.snapshot.append((hotkey, category, command))
+            self.listbox.insert(END, f"{hotkey} -> {category} / {command}")
+
+    def on_select(self, _event=None):
+        idxs = self.listbox.curselection()
+        if not idxs:
             return
-        self.lines[index] = text
-        self.listbox.delete(index)
-        self.listbox.insert(index, f"{prefix} {text}")
-        self.listbox.selection_clear(0, END)
-        self.listbox.selection_set(index)
-        self.listbox.see(index)
-        self.window.update_idletasks()
+        hotkey, category, command = self.snapshot[idxs[0]]
+        self.hotkey_var.set(hotkey)
+        self.category_var.set(category)
+        self.command_var.set(command)
 
-    def mark_running(self, index: int, text: str):
-        self.status_var.set(f"Running step {index + 1}: {text}")
-        self._set_row(index, "[>]", text)
+    def load_selected(self):
+        self.on_select()
 
-    def mark_done(self, index: int, text: str):
-        self.status_var.set(f"Completed step {index + 1}: {text}")
-        self._set_row(index, "[✓]", text)
+    def save_mapping(self):
+        hotkey = self.hotkey_var.get().strip()
+        category = self.category_var.get().strip()
+        command = self.command_var.get().strip()
 
-    def mark_failed(self, index: int, text: str, error: str):
-        self.status_var.set(f"Failed step {index + 1}: {error}")
-        self._set_row(index, "[x]", text)
+        if not hotkey or not category or not command:
+            messagebox.showerror("Hotkey Editor", "Hotkey, category, and command are all required.")
+            return
 
-    def finish(self, success: bool = True):
-        self.status_var.set("Chain complete." if success else "Chain stopped due to error.")
-        self.window.update_idletasks()
+        categories = getattr(self.app.cfg, "Categories", {})
+        if category not in categories:
+            messagebox.showerror("Hotkey Editor", f"Unknown category: {category}")
+            return
+        if command not in categories[category]:
+            messagebox.showerror("Hotkey Editor", f"Unknown command in {category}: {command}")
+            return
 
+        hotkeys = self.app.get_hotkeys_dict()
+        hotkeys[hotkey] = [category, command]
+        self.app.persist_hotkeys()
+        self.app.initialize_hotkeys()
+        self.app.set_status(f"Saved hotkey {hotkey} -> {category}/{command}")
+        self.refresh()
 
-class TermForgeApp:
+    def delete_mapping(self):
+        hotkey = self.hotkey_var.get().strip()
+        if not hotkey:
+            messagebox.showerror("Hotkey Editor", "Enter or select a hotkey to delete.")
+            return
+
+        hotkeys = self.app.get_hotkeys_dict()
+        if hotkey not in hotkeys:
+            messagebox.showerror("Hotkey Editor", f"Hotkey not found: {hotkey}")
+            return
+
+        del hotkeys[hotkey]
+        self.app.persist_hotkeys()
+        self.app.initialize_hotkeys()
+        self.app.set_status(f"Deleted hotkey {hotkey}")
+        self.hotkey_var.set("")
+        self.category_var.set("")
+        self.command_var.set("")
+        self.refresh()
+
+    def reload_hotkeys(self):
+        self.app.initialize_hotkeys()
+        self.app.set_status("Hotkeys reloaded from config.")
+        self.refresh()
+
+class TVMApp:
     def __init__(self, root: Tk, cfg) -> None:
         self.root = root
         self.cfg = cfg
@@ -218,14 +390,18 @@ class TermForgeApp:
         self.status_var = StringVar(value="Ready.")
         self.search_var = StringVar()
         self.category_buttons: dict[str, Button] = {}
+        self.hotkey_listener = None
+        self.hotkeys_enabled = False
+        self.hotkey_status = "Hotkeys not initialized."
 
         if self.debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
         self.load_state()
-        self.log("Starting TermForge")
+        self.log("Starting TVM")
         self.load_plugins(force=True)
         self.build_main()
+        self.initialize_hotkeys()
         self.root.after(250, self.safe_initial_select)
 
     def log(self, message: str) -> None:
@@ -236,6 +412,9 @@ class TermForgeApp:
     def set_status(self, message: str) -> None:
         self.status_var.set(message)
         self.log(message)
+
+    def show_error(self, title: str, message: str) -> None:
+        messagebox.showerror(title, message)
 
     def load_state(self) -> None:
         self.last_window_id = None
@@ -261,10 +440,18 @@ class TermForgeApp:
         except Exception as exc:
             self.log(f"Could not save state file: {exc}")
 
-    def remember_window(self, window_id) -> None:
-        self.window_id = window_id
-        self.last_window_id = window_id
+    def on_close(self) -> None:
         self.save_state()
+        self.log("Shutting down TermForge")
+        try:
+            if self.hotkey_listener is not None:
+                try:
+                    self.hotkey_listener.stop()
+                except Exception:
+                    pass
+            self.root.quit()
+        finally:
+            self.root.destroy()
 
     def add_history_entry(self, action_type, command_text, source="manual") -> None:
         entry = {
@@ -278,13 +465,10 @@ class TermForgeApp:
         self.command_history = self.command_history[:MAX_HISTORY]
         self.save_state()
 
-    def on_close(self) -> None:
+    def remember_window(self, window_id) -> None:
+        self.window_id = window_id
+        self.last_window_id = window_id
         self.save_state()
-        self.log("Shutting down TermForge")
-        try:
-            self.root.quit()
-        finally:
-            self.root.destroy()
 
     def get_favorites(self) -> list[tuple[str, str]]:
         favs = []
@@ -298,8 +482,158 @@ class TermForgeApp:
                     favs.append((category, subcategory))
         return favs
 
+    def get_windows_dict(self) -> dict:
+        windows = getattr(self.cfg, "Windows", None)
+        if windows is None or not isinstance(windows, dict):
+            windows = {}
+            setattr(self.cfg, "Windows", windows)
+        return windows
+
+    def persist_windows(self) -> None:
+        windows = self.get_windows_dict()
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(windows, indent=4)
+            if re.search(r"(?m)^Windows\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Windows = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nWindows = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist window profiles: {exc}")
+
+
+    def get_hotkeys_dict(self) -> dict:
+        hotkeys = getattr(self.cfg, "Hotkeys", None)
+        if hotkeys is None or not isinstance(hotkeys, dict):
+            hotkeys = {}
+            setattr(self.cfg, "Hotkeys", hotkeys)
+        return hotkeys
+
+
+    def persist_hotkeys(self) -> None:
+        hotkeys = self.get_hotkeys_dict()
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(hotkeys, indent=4)
+            if re.search(r"(?m)^Hotkeys\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Hotkeys = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nHotkeys = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist hotkeys: {exc}")
+
+    def open_hotkey_editor(self) -> None:
+        HotkeyEditorWindow(self)
+
+    def _normalize_hotkey_target(self, target):
+        if isinstance(target, (list, tuple)) and len(target) >= 2:
+            return str(target[0]), str(target[1])
+        if isinstance(target, dict):
+            category = target.get("category")
+            command = target.get("command")
+            if category and command:
+                return str(category), str(command)
+        raise TermForgeError(
+            "Hotkey target must be ['Category', 'Command'] or "
+            "{'category': '...', 'command': '...'}."
+        )
+
+    def get_valid_hotkeys(self) -> dict[str, tuple[str, str]]:
+        valid: dict[str, tuple[str, str]] = {}
+        for hotkey, target in self.get_hotkeys_dict().items():
+            try:
+                category, command = self._normalize_hotkey_target(target)
+                if category in getattr(self.cfg, "Categories", {}) and command in self.cfg.Categories[category]:
+                    valid[str(hotkey)] = (category, command)
+                else:
+                    self.log(f"Skipping hotkey {hotkey!r}: target {target!r} not found in Categories.")
+            except Exception as exc:
+                self.log(f"Skipping hotkey {hotkey!r}: {exc}")
+        return valid
+
+    def trigger_hotkey_target(self, category: str, command: str, hotkey: str) -> None:
+        self.set_status(f"Hotkey {hotkey} -> {category}/{command}")
+        self.add_history_entry("hotkey", f"{hotkey} => {category}/{command}", source="hotkey")
+        self.select_cmd(None, category, command)
+
+    def initialize_hotkeys(self) -> None:
+        hotkeys = self.get_valid_hotkeys()
+        if not hotkeys:
+            self.hotkeys_enabled = False
+            self.hotkey_status = "No hotkeys configured."
+            self.log(self.hotkey_status)
+            return
+
+        if pynput_keyboard is None:
+            self.hotkeys_enabled = False
+            self.hotkey_status = (
+                "Global hotkeys unavailable: install pynput "
+                "with 'python -m pip install pynput'."
+            )
+            self.log(self.hotkey_status)
+            return
+
+        if self.hotkey_listener is not None:
+            try:
+                self.hotkey_listener.stop()
+            except Exception:
+                pass
+            self.hotkey_listener = None
+
+        def make_handler(category: str, command: str, hotkey: str):
+            def _handler():
+                self.root.after(0, lambda: self.trigger_hotkey_target(category, command, hotkey))
+            return _handler
+
+        mapping = {
+            hotkey: make_handler(category, command, hotkey)
+            for hotkey, (category, command) in hotkeys.items()
+        }
+
+        try:
+            self.hotkey_listener = pynput_keyboard.GlobalHotKeys(mapping)
+            self.hotkey_listener.start()
+            self.hotkeys_enabled = True
+            self.hotkey_status = f"Global hotkeys active: {len(mapping)}"
+            self.log(self.hotkey_status)
+        except Exception as exc:
+            self.hotkeys_enabled = False
+            self.hotkey_status = f"Could not start global hotkeys: {exc}"
+            self.log(self.hotkey_status)
+
+    def show_hotkeys_help(self) -> None:
+        hotkeys = self.get_valid_hotkeys()
+        lines = [
+            "Global Hotkeys",
+            "",
+            self.hotkey_status,
+            "",
+            "Config format:",
+            "Hotkeys = {",
+            "    '<ctrl>+<alt>+d': ['Admin_CMDs', 'Deploy'],",
+            "}",
+            "",
+        ]
+        if hotkeys:
+            lines.append("Active mappings:")
+            for hotkey, (category, command) in sorted(hotkeys.items()):
+                lines.append(f"  {hotkey} -> {category} / {command}")
+        else:
+            lines.append("No valid hotkeys are currently configured.")
+        messagebox.showinfo("Hotkeys", "\n".join(lines))
+
     def _read_plugin_metadata(self, module, file: Path) -> dict:
-        api_version = getattr(module, "TermForge_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
+        api_version = getattr(module, "TVM_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
         display_name = getattr(module, "PLUGIN_NAME", file.stem)
         plugin_version = getattr(module, "PLUGIN_VERSION", "0.1.0")
         description = getattr(module, "__doc__", "") or getattr(module, "PLUGIN_DESCRIPTION", "")
@@ -315,132 +649,6 @@ class TermForgeApp:
             "path": str(file),
             "has_run": has_run,
         }
-
-    def open_plugin_browser(self) -> None:
-        self.load_plugins(force=False)
-        win = Toplevel(self.root)
-        win.title("Plugin Browser")
-        win.geometry("900x420")
-        win.protocol("WM_DELETE_WINDOW", win.destroy)
-
-        outer = Frame(win, padx=8, pady=8)
-        outer.pack(fill=BOTH, expand=True)
-
-        Label(
-            outer,
-            text=f"Plugin Browser — API v{PLUGIN_API_VERSION}",
-            bd=4,
-            width=40,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
-
-        body = Frame(outer)
-        body.pack(fill=BOTH, expand=True)
-
-        left = Frame(body)
-        left.pack(side=LEFT, fill=Y)
-
-        right = Frame(body)
-        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
-
-        listbox = Listbox(left, width=36, height=18)
-        listbox.pack(side=LEFT, fill=Y)
-
-        scrollbar = Scrollbar(left, command=listbox.yview)
-        scrollbar.pack(side=RIGHT, fill=Y)
-        listbox.config(yscrollcommand=scrollbar.set)
-
-        status_var = StringVar(value="Select a plugin to inspect.")
-        info = Text(right, wrap="word", width=72, height=20)
-        info.pack(fill=BOTH, expand=True)
-        Label(right, textvariable=status_var, anchor="w").pack(fill=X, pady=(6, 0))
-
-        snapshot = []
-
-        def get_plugin_snapshot():
-            rows = []
-            names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
-            for name in names:
-                file = PLUGIN_DIR / f"{name}.py"
-                mtime = "unknown"
-                if file.exists():
-                    mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-                if name in self.plugins:
-                    meta = getattr(self.plugins[name], "__termforge_metadata__", {})
-                    rows.append({
-                        "display_name": meta.get("display_name", name),
-                        "name": name,
-                        "status": "loaded",
-                        "plugin_version": meta.get("plugin_version", "0.1.0"),
-                        "api_version": meta.get("api_version", PLUGIN_API_VERSION),
-                        "compatible": meta.get("compatible", True),
-                        "description": meta.get("description", ""),
-                        "path": str(file),
-                        "mtime": mtime,
-                        "error": "",
-                    })
-                else:
-                    rows.append({
-                        "display_name": name,
-                        "name": name,
-                        "status": "error",
-                        "plugin_version": "unknown",
-                        "api_version": "unknown",
-                        "compatible": False,
-                        "description": "",
-                        "path": str(file),
-                        "mtime": mtime,
-                        "error": self.plugin_errors.get(name, "Unknown plugin load error."),
-                    })
-            return rows
-
-        def refresh_list() -> None:
-            self.load_plugins(force=False)
-            listbox.delete(0, END)
-            snapshot.clear()
-            snapshot.extend(get_plugin_snapshot())
-            for item in snapshot:
-                prefix = "✓" if item["status"] == "loaded" else "✗"
-                listbox.insert(END, f"{prefix} {item['display_name']}  [api {item['api_version']}]")
-            info.delete("1.0", END)
-            info.insert("1.0", "Select a plugin to inspect.\n")
-            status_var.set(f"{len(snapshot)} plugin file(s) found.")
-
-        def show_selected(_event=None) -> None:
-            idxs = listbox.curselection()
-            if not idxs:
-                return
-            item = snapshot[idxs[0]]
-            lines = [
-                f"Name: {item['display_name']}",
-                f"Internal name: {item['name']}",
-                f"Status: {item['status']}",
-                f"Plugin version: {item['plugin_version']}",
-                f"Plugin API version: {item['api_version']}",
-                f"Compatible with TermForge: {item['compatible']}",
-                f"Path: {item['path']}",
-                f"Last modified: {item['mtime']}",
-                "",
-            ]
-            if item["description"]:
-                lines.extend(["Description:", item["description"], ""])
-            if item["error"]:
-                lines.extend(["Load error:", item["error"], ""])
-            info.delete("1.0", END)
-            info.insert("1.0", "\n".join(lines))
-            status_var.set(f"Viewing: {item['display_name']}")
-
-        buttons = Frame(outer)
-        buttons.pack(fill=X, pady=(8, 0))
-
-        Button(buttons, text="Reload", command=refresh_list, bg="navy", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Open Plugin Folder", command=self.open_plugin_folder, bg="darkgreen", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
-
-        listbox.bind("<<ListboxSelect>>", show_selected)
-        refresh_list()
 
     def load_plugins(self, force: bool = False) -> dict[str, object]:
         plugins: dict[str, object] = {}
@@ -460,15 +668,16 @@ class TermForgeApp:
             try:
                 spec = importlib.util.spec_from_file_location(f"termforge_plugin_{name}", file)
                 if spec is None or spec.loader is None:
-                    raise TermForge("Could not create plugin spec.")
+                    raise TermForgeError("Could not create plugin spec.")
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 metadata = self._read_plugin_metadata(module, file)
-                setattr(module, "__termforge_metadata__", metadata)
+                setattr(module, "__tvm_metadata__", metadata)
                 if not metadata["compatible"]:
-                    raise TermForgeError(f"Unsupported plugin API version
-                                         {metadata['api_version']}. This
-                                         TermForge build supports API {PLUGIN_API_VERSION}.")
+                    raise TermForgeError(
+                        f"Unsupported plugin API version {metadata['api_version']}. "
+                        f"This TVM build supports API {PLUGIN_API_VERSION}."
+                    )
                 if not metadata["has_run"]:
                     raise TermForgeError("Plugin does not define run(app, context).")
                 plugins[name] = module
@@ -482,65 +691,12 @@ class TermForgeApp:
         return self.plugins
 
     def reload_plugins_with_notice(self) -> None:
-        old_names = set(self.plugins)
-        old_mtimes = dict(self.plugin_mtimes)
-        old_errors = dict(self.plugin_errors)
         self.load_plugins(force=False)
-        new_names = set(self.plugins)
-        added = sorted(new_names - old_names)
-        removed = sorted(old_names - new_names)
-        changed = sorted(name for name in (new_names & old_names) if self.plugin_mtimes.get(name) != old_mtimes.get(name))
-        failed = sorted(name for name in self.plugin_errors if old_errors.get(name) != self.plugin_errors.get(name))
-        parts = []
-        if added:
-            parts.append(f"Added: {', '.join(added)}")
-        if changed:
-            parts.append(f"Reloaded: {', '.join(changed)}")
-        if removed:
-            parts.append(f"Removed: {', '.join(removed)}")
-        if failed:
-            parts.append(f"Errors: {', '.join(failed)}")
-        if not parts:
-            parts.append("No plugin changes detected.")
         self.set_status("Plugins reloaded.")
-        messagebox.showinfo("Plugins", "\n".join(parts))
-
-    def get_plugin_snapshot(self) -> list[dict]:
-        snapshot = []
-        names = sorted(set(self.plugins.keys()) | set(self.plugin_errors.keys()))
-        for name in names:
-            file = PLUGIN_DIR / f"{name}.py"
-            mtime = "unknown"
-            if file.exists():
-                mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-            if name in self.plugins:
-                meta = getattr(self.plugins[name], "__termforge_metadata__", {})
-                snapshot.append({
-                    "display_name": meta.get("display_name", name),
-                    "name": name,
-                    "status": "loaded",
-                    "plugin_version": meta.get("plugin_version", "0.1.0"),
-                    "api_version": meta.get("api_version", PLUGIN_API_VERSION),
-                    "compatible": meta.get("compatible", True),
-                    "description": meta.get("description", ""),
-                    "path": str(file),
-                    "mtime": mtime,
-                    "error": "",
-                })
-            else:
-                snapshot.append({
-                    "display_name": name,
-                    "name": name,
-                    "status": "error",
-                    "plugin_version": "unknown",
-                    "api_version": "unknown",
-                    "compatible": False,
-                    "description": "",
-                    "path": str(file),
-                    "mtime": mtime,
-                    "error": self.plugin_errors.get(name, "Unknown plugin load error."),
-                })
-        return snapshot
+        messagebox.showinfo(
+            "Plugins",
+            f"Loaded: {len(self.plugins)}\nErrors: {len(self.plugin_errors)}",
+        )
 
     def open_plugin_folder(self) -> None:
         try:
@@ -561,70 +717,67 @@ class TermForgeApp:
             plugin_args = dict(cmd)
         else:
             raise TermForgeError("Plugin command must be a plugin name or dict.")
+
         if not plugin_name:
             raise TermForgeError("Plugin command did not specify a plugin name.")
+
         plugin = self.plugins.get(plugin_name)
         if plugin is None:
             load_error = self.plugin_errors.get(plugin_name)
             if load_error:
                 raise TermForgeError(f"Plugin '{plugin_name}' failed to load: {load_error}")
             raise TermForgeError(f"Plugin '{plugin_name}' was not found in {PLUGIN_DIR}.")
+
         run_fn = getattr(plugin, "run", None)
         if not callable(run_fn):
             raise TermForgeError(f"Plugin '{plugin_name}' does not define run(app, context).")
-        context = {"window_id": self.window_id, "config": self.cfg, "plugin_dir": PLUGIN_DIR, "args": plugin_args.get("args", plugin_args), "app_version": APP_VERSION, "plugin_api_version": PLUGIN_API_VERSION}
+
+        context = {
+            "window_id": self.window_id,
+            "config": self.cfg,
+            "plugin_dir": PLUGIN_DIR,
+            "args": plugin_args.get("args", plugin_args),
+            "app_version": APP_VERSION,
+            "plugin_api_version": PLUGIN_API_VERSION,
+        }
         self.set_status(f"Running plugin: {plugin_name}")
         self.add_history_entry("plugin", plugin_name, source="plugin")
         run_fn(self, context)
 
-    def resolve_command_placeholders(self, cmd: str, shared_vars: dict[str, str] | None = None):
-        if not isinstance(cmd, str):
-            return cmd
-        shared_vars = shared_vars or {}
-        seen = set()
-        prompt_fields = []
-        for field_name in PLACEHOLDER_RE.findall(cmd):
-            if field_name in shared_vars:
-                continue
-            if field_name not in seen:
-                seen.add(field_name)
-                prompt_fields.append(field_name)
-
-        values = dict(shared_vars)
-        if prompt_fields:
-            prompt = MultiFieldPrompt(self.root, "Command Input", prompt_fields)
-            entered = prompt.show()
-            if entered is None:
-                self.set_status("Command cancelled.")
-                return None
-            values.update(entered)
-
-        resolved = cmd
-        for field_name in PLACEHOLDER_RE.findall(cmd):
-            resolved = resolved.replace(f"<{field_name}>", values.get(field_name, ""))
-        return resolved
-
-    def confirm_command(self, cmd_type, cmd, options):
-        if not options.get("confirm", False):
-            return True
-        msg = f"About to run:\n\n{cmd}\n\nType: {cmd_type}"
-        if cmd_type == 2 or cmd_type == "command" or cmd_type == "send":
-            msg += f"\nTarget window: {self.window_id}"
-        return messagebox.askokcancel("Confirm Command", msg)
-
     def _run_helper(self, payload: dict) -> dict:
         command = [sys.executable, "-m", "termforge.xdo_helper"]
         self.log(f"Running helper action={payload.get('action')} payload={payload}")
-        proc = subprocess.run(command, input=json.dumps(payload), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=HELPER_TIMEOUT_SECONDS, check=False)
+        try:
+            proc = subprocess.run(
+                command,
+                input=json.dumps(payload),
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=HELPER_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise TermForgeError("Helper timed out.") from exc
+        except Exception as exc:
+            raise TermForgeError(f"Could not start helper: {exc}") from exc
+
         stdout = (proc.stdout or "").strip()
         stderr = (proc.stderr or "").strip()
         if stderr:
             logging.warning("helper stderr: %s", stderr)
+
         if proc.returncode != 0 and not stdout:
             raise TermForgeError(f"Helper exited with code {proc.returncode}" + (f": {stderr}" if stderr else ""))
+
         if not stdout:
             raise TermForgeError("Helper returned no data.")
-        result = json.loads(stdout)
+
+        try:
+            result = json.loads(stdout)
+        except json.JSONDecodeError as exc:
+            raise TermForgeError(f"Helper returned invalid JSON: {stdout!r}") from exc
+
         if result.get("status") != "ok":
             raise TermForgeError(result.get("error", "Helper reported an unknown error."))
         return result
@@ -649,27 +802,6 @@ class TermForgeApp:
         self.set_status("Remembered window is no longer valid.")
         return False
 
-    def select_target_window(self) -> None:
-        self.root.withdraw()
-        try:
-            result = self._run_helper({"action": "select_window"})
-        finally:
-            self.root.deiconify()
-            self.root.lift()
-            self.root.focus_force()
-        selected = result.get("window_id")
-        if not selected:
-            raise TermForgeError("No window selected.")
-        self.remember_window(selected)
-        self.set_status(f"Selected window: {self.window_id}")
-
-    def select_target_window_with_notice(self) -> None:
-        try:
-            self.select_target_window()
-            messagebox.showinfo("Target Window", f"Selected window id: {self.window_id}")
-        except Exception as exc:
-            self.show_error("Target Window", str(exc))
-
     def safe_initial_select(self) -> None:
         try:
             if self.reuse_last_window():
@@ -684,18 +816,128 @@ class TermForgeApp:
         self.save_state()
         self.set_status("Forgot remembered window.")
 
-    def send_to_selected_window(self, cmd: str) -> None:
+    def select_target_window(self) -> None:
+        self.root.withdraw()
+        try:
+            result = self._run_helper({"action": "select_window"})
+        finally:
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+
+        selected = result.get("window_id")
+        if not selected:
+            raise TermForgeError("No window selected.")
+
+        self.remember_window(selected)
+        self.set_status(f"Selected window: {self.window_id}")
+
+    def select_target_window_with_notice(self) -> None:
+        try:
+            self.select_target_window()
+            messagebox.showinfo("Target Window", f"Selected window id: {self.window_id}")
+        except Exception as exc:
+            self.show_error("Target Window", str(exc))
+
+    def select_profile(self, name: str) -> None:
+        windows = self.get_windows_dict()
+        saved = windows.get(name)
+
+        if saved and self.validate_window_id(saved):
+            self.window_id = saved
+            self.set_status(f"Using profile '{name}' -> {saved}")
+            return
+
+        self.set_status(f"Select window for profile '{name}'")
+        self.select_target_window()
+        windows[name] = self.window_id
+        self.persist_windows()
+
+    def resolve_command_placeholders(self, cmd: str, shared_vars: dict[str, str] | None = None):
+        if not isinstance(cmd, str):
+            return cmd
+
+        shared_vars = shared_vars or {}
+        prompt_fields: list[str] = []
+        seen: set[str] = set()
+
+        for field_name in PLACEHOLDER_RE.findall(cmd):
+            if field_name in shared_vars:
+                continue
+            if field_name not in seen:
+                seen.add(field_name)
+                prompt_fields.append(field_name)
+
+        values = dict(shared_vars)
+
+        if prompt_fields:
+            prompt = MultiFieldPrompt(
+                self.root,
+                "Command Input",
+                prompt_fields,
+                heading="Enter command values",
+            )
+            entered = prompt.show()
+            if entered is None:
+                self.set_status("Command cancelled.")
+                return None
+            values.update(entered)
+
+        resolved = cmd
+        for field_name in PLACEHOLDER_RE.findall(cmd):
+            resolved = resolved.replace(f"<{field_name}>", values.get(field_name, ""))
+        return resolved
+
+    def resolve_shared_vars(self, names: list[str]) -> dict[str, str] | None:
+        prompt = MultiFieldPrompt(
+            self.root,
+            "Shared Variables",
+            names,
+            heading="Enter shared variable values",
+        )
+        values = prompt.show()
+        if values is None:
+            self.set_status("Chain cancelled.")
+            return None
+        return values
+
+    def confirm_command(self, cmd_type, cmd, options):
+        if not options.get("confirm", False):
+            return True
+        msg = f"About to run:\n\n{cmd}\n\nType: {cmd_type}"
+        if cmd_type in (2, "command", "send"):
+            msg += f"\nTarget window: {self.window_id}"
+        return messagebox.askokcancel("Confirm Command", msg)
+
+    def send_to_selected_window(self, cmd: str, record_history: bool = True) -> None:
         if not self.window_id:
             raise TermForgeError("No target window selected.")
+
         self.set_status(f"Sending to window {self.window_id}: {cmd}")
-        result = self._run_helper({"action": "send", "window_id": self.window_id, "text": cmd, "key": "Return", "focus_delay_ms": 150})
+        try:
+            result = self._run_helper(
+                {
+                    "action": "send",
+                    "window_id": self.window_id,
+                    "text": cmd,
+                    "key": "Return",
+                    "focus_delay_ms": 150,
+                }
+            )
+        except TermForgeError as exc:
+            logging.warning("Send failed for window %s: %s", self.window_id, exc)
+            self.window_id = None
+            raise TermForgeError(
+                "Could not send command to the selected window. "
+                "The target may have closed, activation may have failed, or the X11 helper failed. "
+                "Re-select the window and try again."
+            ) from exc
+
         active_window = result.get("active_window")
         self.remember_window(self.window_id)
-        self.add_history_entry(2, cmd, source="send")
+        if record_history:
+            self.add_history_entry(2, cmd, source="send")
         self.set_status(f"Sent to selected window {self.window_id} (active {active_window}).")
-
-    def send_text_to_window(self, text: str) -> None:
-        self.send_to_selected_window(text)
 
     def spawn_terminal(self, cmd: str, record_history: bool = True) -> None:
         if record_history:
@@ -709,45 +951,9 @@ class TermForgeApp:
         self.set_status(f"Running detached command: {cmd}")
         subprocess.Popen(cmd, shell=True)
 
-    def select_profile(self, name):
-        windows = getattr(self.cfg, "Windows", None)
-        if windows is None or not isinstance(windows, dict):
-            windows = {}
-            setattr(self.cfg, "Windows", windows)
-
-        saved = windows.get(name)
-        if saved and self.validate_window_id(saved):
-            self.window_id = saved
-            self.set_status(f"Using profile '{name}' -> {saved}")
-            return
-
-        self.set_status(f"Select window for profile '{name}'")
-        self.select_target_window()
-        windows[name] = self.window_id
-
-        try:
-            import pprint
-            text = CONFIG_FILE.read_text(encoding="utf-8")
-            new_windows = pprint.pformat(windows, indent=4)
-            if re.search(r"(?m)^Windows\s*=", text):
-                text = re.sub(r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)", f"Windows = {new_windows}\n", text)
-            else:
-                text += f"\n\nWindows = {new_windows}\n"
-            CONFIG_FILE.write_text(text, encoding="utf-8")
-        except Exception as exc:
-            self.log(f"Could not persist window profile: {exc}")
-
-    def run_sleep(self, seconds):
+    def run_sleep(self, seconds) -> None:
         self.set_status(f"Sleeping {seconds}s...")
         time.sleep(float(seconds))
-
-    def resolve_shared_vars(self, names: list[str]) -> dict[str, str] | None:
-        prompt = MultiFieldPrompt(self.root, "Shared Variables", names)
-        values = prompt.show()
-        if values is None:
-            self.set_status("Chain cancelled.")
-            return None
-        return values
 
     def run_chain(self, steps, source="chain") -> None:
         if not isinstance(steps, (list, tuple)) or not steps:
@@ -755,46 +961,77 @@ class TermForgeApp:
 
         total = len(steps)
         shared_vars: dict[str, str] = {}
+        runner = ChainRunnerWindow(self.root, total)
 
         for index, step in enumerate(steps, start=1):
             if not isinstance(step, (list, tuple)) or not step:
+                runner.step_failed(f"Invalid chain step: {step!r}")
                 raise TermForgeError(f"Invalid chain step: {step!r}")
 
             step_kind = step[0]
+            try:
+                if step_kind == "vars":
+                    runner.step_running(index, total, "shared vars")
+                    if len(step) < 2 or not isinstance(step[1], (list, tuple)):
+                        raise TermForgeError("vars step requires a list of variable names.")
+                    names = [str(name) for name in step[1]]
+                    values = self.resolve_shared_vars(names)
+                    if values is None:
+                        runner.step_failed("Chain cancelled during shared vars.")
+                        return
+                    shared_vars.update(values)
+                    runner.step_done(f"Shared vars captured: {', '.join(names)}")
+                    continue
 
-            if step_kind == "vars":
-                if len(step) < 2 or not isinstance(step[1], (list, tuple)):
-                    raise TermForgeError("vars step requires a list of variable names.")
-                names = [str(name) for name in step[1]]
-                self.set_status(f"Chain step {index}/{total}: shared vars")
-                values = self.resolve_shared_vars(names)
-                if values is None:
-                    return
-                shared_vars.update(values)
-                continue
+                if step_kind == "sleep":
+                    if len(step) < 2:
+                        raise TermForgeError("Sleep step requires a number of seconds.")
+                    runner.step_running(index, total, f"sleep {step[1]}")
+                    self.run_sleep(step[1])
+                    runner.step_done(f"Slept {step[1]}s")
+                    continue
 
-            if step_kind == "sleep":
-                if len(step) < 2:
-                    raise TermForgeError("Sleep step requires a number of seconds.")
-                self.set_status(f"Chain step {index}/{total}: sleep {step[1]}")
-                self.run_sleep(step[1])
-                continue
+                if step_kind == "select_profile":
+                    if len(step) < 2:
+                        raise TermForgeError("select_profile step requires a profile name.")
+                    runner.step_running(index, total, f"select profile {step[1]}")
+                    self.select_profile(str(step[1]))
+                    runner.step_done(f"Using profile {step[1]}")
+                    continue
 
-            if step_kind == "select_profile":
-                if len(step) < 2:
-                    raise TermForgeError("select_profile step requires a profile name.")
-                self.set_status(f"Chain step {index}/{total}: select profile {step[1]}")
-                self.select_profile(step[1])
-                continue
-
-            step_type, step_cmd, step_options = parse_command_entry(step)
-            self.set_status(f"Chain step {index}/{total}: {step_cmd}")
-            self.run_cmd(step_type, step_cmd, step_options, None, record_history=False, shared_vars=shared_vars)
+                step_type, step_cmd, step_options = parse_command_entry(step)
+                if isinstance(step_cmd, str):
+                    step_cmd = self.resolve_command_placeholders(step_cmd, shared_vars=shared_vars)
+                    if step_cmd is None:
+                        runner.step_failed("Chain cancelled.")
+                        return
+                runner.step_running(index, total, str(step_cmd))
+                self.run_cmd(
+                    step_type,
+                    step_cmd,
+                    step_options,
+                    None,
+                    record_history=False,
+                    shared_vars=shared_vars,
+                )
+                runner.step_done(str(step_cmd))
+            except Exception as exc:
+                runner.step_failed(str(exc))
+                raise
 
         self.add_history_entry("chain", f"{total} steps", source=source)
         self.set_status(f"Chain complete: {total} step(s).")
+        runner.finished()
 
-    def run_cmd(self, cmd_type, cmd, options=None, current_window=None, record_history: bool = True, shared_vars: dict[str, str] | None = None, raise_on_error: bool = False) -> None:
+    def run_cmd(
+        self,
+        cmd_type,
+        cmd,
+        options=None,
+        current_window=None,
+        record_history: bool = True,
+        shared_vars: dict[str, str] | None = None,
+    ) -> None:
         try:
             if options is None:
                 options = {}
@@ -811,24 +1048,24 @@ class TermForgeApp:
                 resolved_cmd = self.resolve_command_placeholders(cmd, shared_vars=shared_vars)
                 if resolved_cmd is None:
                     return
+
             if not self.confirm_command(normalized, resolved_cmd, options):
                 self.set_status("Command cancelled by user.")
                 return
-            if normalized == 0 or normalized == "select":
+
+            if normalized in (0, "select"):
                 self.select_target_window()
-            elif normalized == 1 or normalized == "spawn":
+            elif normalized in (1, "spawn"):
                 self.spawn_terminal(str(resolved_cmd), record_history=record_history)
-            elif normalized == 2 or normalized == "command" or normalized == "send":
-                self.send_to_selected_window(str(resolved_cmd))
-            elif normalized == 3 or normalized == "detached":
+            elif normalized in (2, "command", "send"):
+                self.send_to_selected_window(str(resolved_cmd), record_history=record_history)
+            elif normalized in (3, "detached"):
                 self.run_detached(str(resolved_cmd), record_history=record_history)
             elif normalized == "plugin":
                 self.run_plugin(cmd)
             else:
                 raise TermForgeError(f"Unknown command type: {cmd_type}")
         except Exception as exc:
-            if raise_on_error:
-                raise
             self.show_error("Command failed", f"{exc}\n\n{traceback.format_exc()}")
 
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
@@ -896,26 +1133,131 @@ class TermForgeApp:
         if not query:
             self.set_status("Enter a search term first.")
             return
+
         results = self.collect_search_results(query)
         win = Toplevel(self.root)
         win.title(f"Search Results: {query}")
         win.protocol("WM_DELETE_WINDOW", win.destroy)
-        Label(win, text=f"Matches for: {query}", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(padx=8, pady=(8, 6))
+
+        Label(
+            win,
+            text=f"Matches for: {query}",
+            bd=4,
+            width=40,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(padx=8, pady=(8, 6))
+
         if not results:
             Label(win, text="No matching commands found.").pack(padx=8, pady=8)
         else:
             for category, subcategory in results:
-                Button(win, text=f"{category} → {subcategory}", width=40, bg="black", fg="yellow", command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s)).pack(pady=2, padx=8)
+                Button(
+                    win,
+                    text=f"{category} → {subcategory}",
+                    width=40,
+                    bg="black",
+                    fg="yellow",
+                    command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s),
+                ).pack(pady=2, padx=8)
+
         Button(win, text="Close", width=40, bg="red", fg="black", command=win.destroy).pack(pady=(8, 8))
 
     def clear_search(self) -> None:
         self.search_var.set("")
         self.update_category_filter()
 
+    def open_history_window(self) -> None:
+        win = Toplevel(self.root)
+        win.title("Command History")
+        win.geometry("900x420")
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+
+        outer = Frame(win, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+        Label(outer, text="Recent Commands", bd=4, width=40, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
+        body = Frame(outer)
+        body.pack(fill=BOTH, expand=True)
+        left = Frame(body)
+        left.pack(side=LEFT, fill=Y)
+        right = Frame(body)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(8, 0))
+
+        listbox = Listbox(left, width=44, height=18)
+        listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        listbox.config(yscrollcommand=scrollbar.set)
+
+        info = Text(right, wrap="word", width=72, height=20)
+        info.pack(fill=BOTH, expand=True)
+        selected_entry = {"value": None}
+
+        def refresh() -> None:
+            listbox.delete(0, END)
+            for entry in self.command_history:
+                label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
+                listbox.insert(END, label)
+            info.delete("1.0", END)
+            info.insert("1.0", "Select a history entry to inspect or rerun.\n")
+
+        def show_selected(_event=None) -> None:
+            idxs = listbox.curselection()
+            if not idxs:
+                return
+            entry = self.command_history[idxs[0]]
+            selected_entry["value"] = entry
+            lines = [
+                f"Time: {entry.get('timestamp','')}",
+                f"Action: {entry.get('action_type','')}",
+                f"Source: {entry.get('source','')}",
+                f"Window ID: {entry.get('window_id','')}",
+                "",
+                "Command:",
+                entry.get("command", ""),
+            ]
+            info.delete("1.0", END)
+            info.insert("1.0", "\n".join(lines))
+
+        def rerun_selected() -> None:
+            entry = selected_entry["value"]
+            if not entry:
+                self.set_status("Select a history entry first.")
+                return
+            self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
+
+        def clear_history() -> None:
+            if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
+                return
+            self.command_history = []
+            self.save_state()
+            refresh()
+            self.set_status("Command history cleared.")
+
+        buttons = Frame(outer)
+        buttons.pack(fill=X, pady=(8, 0))
+        Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
+        Button(buttons, text="Clear History", command=clear_history, bg="#7f6000", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
+        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
+
+        listbox.bind("<<ListboxSelect>>", show_selected)
+        refresh()
+
     def build_main(self) -> None:
         frame = Frame(self.root, padx=8, pady=8)
         frame.pack()
-        Label(frame, text=f"{APP_NAME} {APP_VERSION}", bd=4, width=28, bg="lightgreen", fg="black", relief="raised").pack(pady=(0, 8))
+
+        Label(
+            frame,
+            text=f"{APP_NAME} {APP_VERSION}",
+            bd=4,
+            width=28,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
 
         favorites = self.get_favorites()
         if favorites:
@@ -923,7 +1265,14 @@ class TermForgeApp:
             favorites_frame = Frame(frame)
             favorites_frame.pack(fill=X, pady=(0, 8))
             for category, subcategory in favorites:
-                Button(favorites_frame, text=subcategory, width=13, bg="#1f4e79", fg="white", command=lambda c=category, s=subcategory: self.run_favorite(c, s)).pack(side=LEFT, padx=2, pady=2)
+                Button(
+                    favorites_frame,
+                    text=subcategory,
+                    width=13,
+                    bg="#1f4e79",
+                    fg="white",
+                    command=lambda c=category, s=subcategory: self.run_favorite(c, s),
+                ).pack(side=LEFT, padx=2, pady=2)
 
         search_row = Frame(frame)
         search_row.pack(fill=X, pady=(0, 8))
@@ -940,37 +1289,74 @@ class TermForgeApp:
         self.category_buttons = {}
         categories = getattr(self.cfg, "Categories", {})
         for category in categories:
-            btn = Button(categories_frame, text=category, width=28, bg="black", fg="yellow", command=lambda c=category: self.open_category(c))
+            btn = Button(
+                categories_frame,
+                text=category,
+                width=28,
+                bg="black",
+                fg="yellow",
+                command=lambda c=category: self.open_category(c),
+            )
             btn.pack(pady=2)
             self.category_buttons[category] = btn
 
-        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=(8, 2))
+        Button(frame, text="History", width=28, bg="#4b3869", fg="white", command=self.open_history_window).pack(pady=(8, 2))
+        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=2)
         Button(frame, text="Forget Saved Window", width=28, bg="#7f6000", fg="white", command=self.forget_saved_window).pack(pady=2)
         Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=2)
-        Button(frame, text="Plugin Folder", width=28, bg="purple", fg="white", command=self.open_plugin_folder).pack(pady=2) 
+        Button(frame, text="Plugin Folder", width=28, bg="purple", fg="white", command=self.open_plugin_folder).pack(pady=2)
         Button(frame, text="Reload Plugins", width=28, bg="navy", fg="white", command=self.reload_plugins_with_notice).pack(pady=2)
+        Button(frame, text="Hotkeys", width=28, bg="#444444", fg="white", command=self.show_hotkeys_help).pack(pady=2)
+        Button(frame, text="Hotkey Editor", width=28, bg="#555577", fg="white", command=self.open_hotkey_editor).pack(pady=2)
         Button(frame, text="Exit", width=28, bg="red", fg="black", command=self.on_close).pack(pady=(8, 4))
-        Label(frame, textvariable=self.status_var, anchor="w", justify="left", width=40, wraplength=320, bg="#f0f0f0", fg="black", relief="sunken", padx=6, pady=4).pack(fill=X, pady=(4, 0))
+
+        Label(
+            frame,
+            textvariable=self.status_var,
+            anchor="w",
+            justify="left",
+            width=40,
+            wraplength=320,
+            bg="#f0f0f0",
+            fg="black",
+            relief="sunken",
+            padx=6,
+            pady=4,
+        ).pack(fill=X, pady=(4, 0))
 
     def open_category(self, category: str) -> None:
         win = Toplevel(self.root)
         win.title(category)
         win.protocol("WM_DELETE_WINDOW", win.destroy)
-        Label(win, text=category, bd=4, width=28, bg="lightgreen", fg="black", relief="raised").pack(padx=8, pady=(8, 6))
-        for subcategory in self.cfg.Categories[category]:
-            Button(win, text=subcategory, width=28, bg="black", fg="yellow", command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s)).pack(pady=2, padx=8)
-        Button(win, text="Close", width=28, bg="red", fg="black", command=win.destroy).pack(pady=(8, 8))
 
-    @staticmethod
-    def show_error(title: str, message: str) -> None:
-        messagebox.showerror(title, message)
+        Label(
+            win,
+            text=category,
+            bd=4,
+            width=28,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(padx=8, pady=(8, 6))
+
+        for subcategory in self.cfg.Categories[category]:
+            Button(
+                win,
+                text=subcategory,
+                width=28,
+                bg="black",
+                fg="yellow",
+                command=lambda c=category, s=subcategory, w=win: self.select_cmd(w, c, s),
+            ).pack(pady=2, padx=8)
+
+        Button(win, text="Close", width=28, bg="red", fg="black", command=win.destroy).pack(pady=(8, 8))
 
 
 def main() -> int:
     ensure_user_config()
     cfg = load_config()
     root = Tk()
-    TermForgeApp(root, cfg)
+    TVMApp(root, cfg)
     root.mainloop()
     return 0
 
