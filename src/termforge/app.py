@@ -28,6 +28,7 @@ from tkinter import (
     Frame,
     Label,
     Listbox,
+    Menu,
     Scrollbar,
     StringVar,
     Text,
@@ -1475,7 +1476,46 @@ class TermForgeApp:
         listbox.bind("<<ListboxSelect>>", show_selected)
         refresh()
 
+
+    def build_menu(self) -> None:
+        menubar = Menu(self.root)
+
+        file_menu = Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Exit", command=self.on_close)
+        menubar.add_cascade(label="File", menu=file_menu)
+
+        tools_menu = Menu(menubar, tearoff=0)
+        tools_menu.add_command(label="Select Target Window", command=self.select_target_window_with_notice)
+        tools_menu.add_command(label="Reuse Saved Window", command=self.reuse_last_window)
+        tools_menu.add_command(label="Forget Saved Window", command=self.forget_saved_window)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="History", command=self.open_history_window)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Plugin Manager", command=self.open_plugin_manager)
+        tools_menu.add_command(label="Reload Plugins", command=self.reload_plugins_with_notice)
+        tools_menu.add_command(label="Open Plugin Folder", command=self.open_plugin_folder)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Hotkeys", command=self.show_hotkeys_help)
+        tools_menu.add_command(label="Hotkey Editor", command=self.open_hotkey_editor)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+
+        help_menu = Menu(menubar, tearoff=0)
+        help_menu.add_command(label="About TermForge", command=self.show_about)
+        menubar.add_cascade(label="Help", menu=help_menu)
+
+        self.root.config(menu=menubar)
+
+    def show_about(self) -> None:
+        messagebox.showinfo(
+            "About TermForge",
+            f"{APP_NAME} {APP_VERSION}\n\n"
+            "Terminal workflow engine for X11 terminals.\n"
+            "Build command chains, hotkeys, plugins, and reusable terminal automations.",
+        )
+
     def build_main(self) -> None:
+        self.build_menu()
+
         frame = Frame(self.root, padx=8, pady=8)
         frame.pack()
 
@@ -1530,15 +1570,15 @@ class TermForgeApp:
             btn.pack(pady=2)
             self.category_buttons[category] = btn
 
-        Button(frame, text="History", width=28, bg="#4b3869", fg="white", command=self.open_history_window).pack(pady=(8, 2))
-        Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=2)
-        Button(frame, text="Forget Saved Window", width=28, bg="#7f6000", fg="white", command=self.forget_saved_window).pack(pady=2)
-        Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=2)
-        Button(frame, text="Plugin Manager", width=28, bg="purple", fg="white", command=self.open_plugin_manager).pack(pady=2)
-        Button(frame, text="Reload Plugins", width=28, bg="navy", fg="white", command=self.reload_plugins_with_notice).pack(pady=2)
-        Button(frame, text="Hotkeys", width=28, bg="#444444", fg="white", command=self.show_hotkeys_help).pack(pady=2)
-        Button(frame, text="Hotkey Editor", width=28, bg="#555577", fg="white", command=self.open_hotkey_editor).pack(pady=2)
-        Button(frame, text="Exit", width=28, bg="red", fg="black", command=self.on_close).pack(pady=(8, 4))
+        Label(
+            frame,
+            text="Use the Tools menu for windows, history, plugins, and hotkeys.",
+            width=44,
+            bg="#f7f7d0",
+            fg="black",
+            relief="groove",
+            pady=4,
+        ).pack(fill=X, pady=(8, 4))
 
         Label(
             frame,
