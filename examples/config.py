@@ -58,6 +58,16 @@ Categories = {
         'Danger Upgrade': [2, 'sudo apt update -y', {'confirm': True}],
     },
 
+    "Git_CMDs": {
+        "Git Init": [2, "git init"],
+        "Git Add": [2, "git add <name>"],
+        "Git status": [2, "git status"],
+        "Git Commit": [2, "git commit -m \"<message>\""],
+        "Git Push": [2, "git push"],
+        "Git Push origin main": [2, "git push -u origin main"],
+        "Git Clone": [2, "git clone "]
+    },
+
     'Applications': {
         'htop': [1, 'htop'],
         'Visual Studio Code': [3, 'code > /dev/null 2>&1 &'],
