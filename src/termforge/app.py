@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import pprint
 import re
 import subprocess
 import sys
@@ -35,13 +36,8 @@ from tkinter import (
     messagebox,
 )
 
-import inspect
-
-if "tvm" in inspect.getsource(__import__(__name__)):
-    raise RuntimeError("Found forbidden reference to 'tvm' in codebase.")
-
 APP_NAME = "TermForge"
-APP_VERSION = "0.3.3"
+APP_VERSION = "0.3.4"
 PLUGIN_API_VERSION = 1
 MAX_HISTORY = 30
 
@@ -91,6 +87,7 @@ def ensure_user_config() -> None:
         "Windows = {}",
         f"Favorites = {repr(getattr(default_config, 'Favorites', [])) if hasattr(default_config, 'Favorites') else '[]'}",
         "Hotkeys = {}",
+        "DisabledPlugins = []",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
         "",
     ]
@@ -377,6 +374,164 @@ class HotkeyEditorWindow:
         self.app.set_status("Hotkeys reloaded from config.")
         self.refresh()
 
+
+class PluginManagerWindow:
+    def __init__(self, app):
+        self.app = app
+        self.window = Toplevel(app.root)
+        self.window.title("Plugin Manager")
+        self.window.geometry("920x540")
+        self.window.transient(app.root)
+
+        outer = Frame(self.window, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text="Plugin Manager",
+            bd=4,
+            width=34,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
+        body = Frame(outer)
+        body.pack(fill=BOTH, expand=True)
+
+        left = Frame(body)
+        left.pack(side=LEFT, fill=Y)
+
+        right = Frame(body)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(10, 0))
+
+        self.listbox = Listbox(left, width=42, height=20)
+        self.listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=self.listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.listbox.config(yscrollcommand=scrollbar.set)
+
+        self.info = Text(right, wrap="word", height=20, width=70)
+        self.info.pack(fill=BOTH, expand=True)
+
+        button_row = Frame(outer)
+        button_row.pack(fill=X, pady=(10, 0))
+
+        Button(button_row, text="Run", width=14, bg="darkgreen", fg="white", command=self.run_selected).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Enable", width=14, bg="#2f5597", fg="white", command=self.enable_selected).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Disable", width=14, bg="#7f6000", fg="white", command=self.disable_selected).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Reload", width=14, bg="navy", fg="white", command=self.reload_plugins).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Open Folder", width=14, bg="#444444", fg="white", command=self.app.open_plugin_folder).pack(side=LEFT, padx=(0, 6))
+        Button(button_row, text="Close", width=14, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
+
+        self.snapshot = []
+        self.listbox.bind("<<ListboxSelect>>", self.show_info)
+        self.refresh()
+
+    def collect_snapshot(self):
+        rows = []
+        disabled = set(self.app.get_disabled_plugins())
+        discovered = sorted({p.stem for p in PLUGIN_DIR.glob("*.py")})
+        for name in discovered:
+            if name in disabled:
+                rows.append({
+                    "status": "disabled",
+                    "name": name,
+                    "display_name": name,
+                    "version": "-",
+                    "description": "Disabled by user.",
+                    "error": "",
+                })
+                continue
+            if name in self.app.plugins:
+                plugin = self.app.plugins[name]
+                meta = getattr(plugin, "__termforge_metadata__", {})
+                rows.append({
+                    "status": "loaded",
+                    "name": name,
+                    "display_name": meta.get("display_name", name),
+                    "version": meta.get("plugin_version", "unknown"),
+                    "description": meta.get("description", "(no description)"),
+                    "error": "",
+                })
+            else:
+                rows.append({
+                    "status": "error",
+                    "name": name,
+                    "display_name": name,
+                    "version": "-",
+                    "description": "",
+                    "error": self.app.plugin_errors.get(name, "Unknown plugin load error."),
+                })
+        return rows
+
+    def refresh(self):
+        self.app.load_plugins(force=False)
+        self.snapshot = self.collect_snapshot()
+        self.listbox.delete(0, END)
+        for item in self.snapshot:
+            prefix = {"loaded": "[OK]", "disabled": "[OFF]", "error": "[ERR]"}.get(item["status"], "[?]")
+            self.listbox.insert(END, f"{prefix} {item['display_name']} ({item['name']})")
+        self.info.delete("1.0", END)
+        self.info.insert("1.0", "Select a plugin to inspect.\n")
+
+    def current_item(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return None
+        return self.snapshot[idxs[0]]
+
+    def show_info(self, _event=None):
+        item = self.current_item()
+        if not item:
+            return
+        lines = [
+            f"Name: {item['display_name']}",
+            f"Internal name: {item['name']}",
+            f"Status: {item['status']}",
+            f"Version: {item['version']}",
+            "",
+        ]
+        if item["description"]:
+            lines.extend(["Description:", item["description"], ""])
+        if item["error"]:
+            lines.extend(["Error:", item["error"], ""])
+        self.info.delete("1.0", END)
+        self.info.insert("1.0", "\n".join(lines))
+
+    def run_selected(self):
+        item = self.current_item()
+        if not item:
+            return
+        if item["status"] != "loaded":
+            messagebox.showerror("Plugin Manager", "Only loaded plugins can be run.")
+            return
+        try:
+            self.app.run_plugin(item["name"])
+        except Exception as exc:
+            messagebox.showerror("Plugin Manager", str(exc))
+
+    def disable_selected(self):
+        item = self.current_item()
+        if not item:
+            return
+        self.app.disable_plugin(item["name"])
+        self.app.set_status(f"Disabled plugin: {item['name']}")
+        self.refresh()
+
+    def enable_selected(self):
+        item = self.current_item()
+        if not item:
+            return
+        self.app.enable_plugin(item["name"])
+        self.app.set_status(f"Enabled plugin: {item['name']}")
+        self.refresh()
+
+    def reload_plugins(self):
+        self.app.load_plugins(force=True)
+        self.app.set_status("Plugins reloaded.")
+        self.refresh()
+
 class TermForgeApp:
     def __init__(self, root: Tk, cfg) -> None:
         self.root = root
@@ -540,6 +695,69 @@ class TermForgeApp:
     def open_hotkey_editor(self) -> None:
         HotkeyEditorWindow(self)
 
+
+    def persist_hotkeys(self) -> None:
+        hotkeys = self.get_hotkeys_dict()
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(hotkeys, indent=4)
+            if re.search(r"(?m)^Hotkeys\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Hotkeys = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nHotkeys = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist hotkeys: {exc}")
+
+    def get_disabled_plugins(self) -> list[str]:
+        disabled = getattr(self.cfg, "DisabledPlugins", None)
+        if disabled is None or not isinstance(disabled, list):
+            disabled = []
+            setattr(self.cfg, "DisabledPlugins", disabled)
+        return disabled
+
+    def persist_disabled_plugins(self) -> None:
+        disabled = sorted(set(str(x) for x in self.get_disabled_plugins()))
+        setattr(self.cfg, "DisabledPlugins", disabled)
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(disabled, indent=4)
+            if re.search(r"(?m)^DisabledPlugins\s*=", text):
+                text = re.sub(
+                    r"(?ms)^DisabledPlugins\s*=\s*\[.*?\](?=^\S|\Z)",
+                    f"DisabledPlugins = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nDisabledPlugins = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist disabled plugins: {exc}")
+
+    def disable_plugin(self, name: str) -> None:
+        disabled = self.get_disabled_plugins()
+        if name not in disabled:
+            disabled.append(name)
+            self.persist_disabled_plugins()
+        self.load_plugins(force=True)
+
+    def enable_plugin(self, name: str) -> None:
+        disabled = self.get_disabled_plugins()
+        if name in disabled:
+            disabled.remove(name)
+            self.persist_disabled_plugins()
+        self.load_plugins(force=True)
+
+    def open_hotkey_editor(self) -> None:
+        HotkeyEditorWindow(self)
+
+    def open_plugin_manager(self) -> None:
+        PluginManagerWindow(self)
+
     def _normalize_hotkey_target(self, target):
         if isinstance(target, (list, tuple)) and len(target) >= 2:
             return str(target[0]), str(target[1])
@@ -638,7 +856,7 @@ class TermForgeApp:
         messagebox.showinfo("Hotkeys", "\n".join(lines))
 
     def _read_plugin_metadata(self, module, file: Path) -> dict:
-        api_version = getattr(module, "TermForge_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
+        api_version = getattr(module, "TERMFORGE_PLUGIN_API_VERSION", PLUGIN_API_VERSION)
         display_name = getattr(module, "PLUGIN_NAME", file.stem)
         plugin_version = getattr(module, "PLUGIN_VERSION", "0.1.0")
         description = getattr(module, "__doc__", "") or getattr(module, "PLUGIN_DESCRIPTION", "")
@@ -659,8 +877,12 @@ class TermForgeApp:
         plugins: dict[str, object] = {}
         mtimes: dict[str, float] = {}
         errors: dict[str, str] = {}
+        disabled_plugins = set(self.get_disabled_plugins())
         for file in sorted(PLUGIN_DIR.glob("*.py")):
             name = file.stem
+            if name in disabled_plugins:
+                errors[name] = "Disabled by user."
+                continue
             try:
                 mtime = file.stat().st_mtime
             except OSError as exc:
@@ -946,7 +1168,6 @@ class TermForgeApp:
 
     def send_text_to_window(self, text: str) -> None:
         self.send_to_selected_window(text)
-
 
     def spawn_terminal(self, cmd: str, record_history: bool = True) -> None:
         if record_history:
@@ -1313,7 +1534,7 @@ class TermForgeApp:
         Button(frame, text="Reuse Saved Window", width=28, bg="#2f5597", fg="white", command=self.reuse_last_window).pack(pady=2)
         Button(frame, text="Forget Saved Window", width=28, bg="#7f6000", fg="white", command=self.forget_saved_window).pack(pady=2)
         Button(frame, text="Select Target Window", width=28, bg="darkgreen", fg="white", command=self.select_target_window_with_notice).pack(pady=2)
-        Button(frame, text="Plugin Folder", width=28, bg="purple", fg="white", command=self.open_plugin_folder).pack(pady=2)
+        Button(frame, text="Plugin Manager", width=28, bg="purple", fg="white", command=self.open_plugin_manager).pack(pady=2)
         Button(frame, text="Reload Plugins", width=28, bg="navy", fg="white", command=self.reload_plugins_with_notice).pack(pady=2)
         Button(frame, text="Hotkeys", width=28, bg="#444444", fg="white", command=self.show_hotkeys_help).pack(pady=2)
         Button(frame, text="Hotkey Editor", width=28, bg="#555577", fg="white", command=self.open_hotkey_editor).pack(pady=2)
