@@ -1,9 +1,9 @@
-🖥️ TVM — Terminal Virtual Macropad
-<p align="center"> <b>A programmable macro pad for controlling terminal windows on Linux (X11)</b> </p> <p align="center"> <a href="https://pypi.org/project/tvm/"> <img src="https://img.shields.io/pypi/v/tvm.svg"> </a> <a href="https://pypi.org/project/tvm/"> <img src="https://img.shields.io/pypi/pyversions/tvm.svg"> </a> <a href="https://github.com/cmora111/tvm/blob/main/LICENSE"> <img src="https://img.shields.io/github/license/cmora111/tvm.svg"> </a> <a href="https://github.com/cmora111/tvm/commits/main"> <img src="https://img.shields.io/github/last-commit/cmora111/tvm.svg"> </a> <a href="#installation"> <img src="https://img.shields.io/badge/install-pip%20-e-blue"> </a> </p>
+🖥️ TermForge — Terminal Virtual Macropad
+<p align="center"> <b>A programmable macro pad for controlling terminal windows on Linux (X11)</b> </p> <p align="center"> <a href="https://pypi.org/project/termforge/"> <img src="https://img.shields.io/pypi/v/termforge.svg"> </a> <a href="https://pypi.org/project/termforge/"> <img src="https://img.shields.io/pypi/pyversions/termforge.svg"> </a> <a href="https://github.com/cmora111/termforge/blob/main/LICENSE"> <img src="https://img.shields.io/github/license/cmora111/termforge.svg"> </a> <a href="https://github.com/cmora111/termforge/commits/main"> <img src="https://img.shields.io/github/last-commit/cmora111/termforge.svg"> </a> <a href="#installation"> <img src="https://img.shields.io/badge/install-pip%20-e-blue"> </a> </p>
 <p align="center"> Build powerful terminal automations with chains, variables, profiles, and plugins. </p>
 📸 Preview
 <p align="center"> <img src="docs/main.png" width="600"> </p>
-⚡ Why TVM?
+⚡ Why TermForge?
 <p align="center">
 Feature	What it gives you
 🔗 Chains	Automate multi-step workflows
@@ -27,20 +27,20 @@ Feature	What it gives you
 
 👉 Prompts once → runs full deployment workflow
 
-🧠 What TVM Really Is
+🧠 What TermForge Really Is
 
 Not just a macro pad —
 a lightweight terminal automation engine with a UI.
 
 🔧 Installation
-git clone https://github.com/cmora111/tvm.git
-cd tvm
+git clone https://github.com/cmora111/TermForge.git
+cd termforge
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-python -m tvm
+python -m termforge
 📁 Project Structure
-src/tvm/
+src/termforge/
     app.py
     cli.py
     xdo_helper.py
@@ -54,7 +54,7 @@ Linux (X11 — not Wayland)
 xdotool
 sudo apt install xdotool
 🧩 Plugin Example
-TVM_PLUGIN_API_VERSION = 1
+TermForge_PLUGIN_API_VERSION = 1
 
 def run(app, context):
     app.set_status("Hello from plugin!")
@@ -66,7 +66,7 @@ MIT
 
 If you find yourself repeating terminal tasks…
 
-TVM turns them into one-click workflows.
+TermForge turns them into one-click workflows.
 
 🔥 Optional next upgrade
 

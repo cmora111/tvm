@@ -21,3 +21,11 @@ build/
 .venv
 post
 planned_updates
+
+# Logs
+*.log
+
+# OS/editor noise
+*.swp
+*~
+

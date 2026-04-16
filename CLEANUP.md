@@ -1,4 +1,4 @@
-# TVM Repository Cleanup Guide
+# TermForge Repository Cleanup Guide
 
 This checklist helps keep the repository clean, consistent, and ready for development and distribution.
 
@@ -14,10 +14,10 @@ README.md
 LICENSE
 docs/
 examples/
-src/tvm/
+src/termforge/
 ```
 
-Inside `src/tvm/`, keep:
+Inside `src/termforge/`, keep:
 
 ```
 __init__.py
@@ -41,24 +41,12 @@ plugins/hello_world.py
 
 These should NOT be committed:
 
-```
-build/
-dist/
-*.egg-info/
-__pycache__/
 *.pyc
 ```
 
 Specific files to remove:
 
 ```
-src/tvm_macropad.egg-info/
-src/tvm/__pycache__/
-build/
-src/tvm/confirmation_patch.py
-setup.py   (only if fully using pyproject.toml)
-```
-
 ---
 
 ## ⚠️ Review (Optional Files)
@@ -66,8 +54,6 @@ setup.py   (only if fully using pyproject.toml)
 Decide whether to keep or move:
 
 ```
-planned_updates
-post
 project.html
 ```
 
@@ -82,7 +68,7 @@ Questions:
 ## 📁 Target Repository Structure
 
 ```
-tvm_package/
+termforge/
 ├── docs/
 ├── examples/
 │   ├── config.py
@@ -92,7 +78,7 @@ tvm_package/
 ├── README.md
 ├── pyproject.toml
 └── src/
-    └── tvm/
+    └── termforge/
         ├── __init__.py
         ├── __main__.py
         ├── app.py
@@ -108,23 +94,10 @@ tvm_package/
 Run from repo root:
 
 ```bash
-rm -rf build
-rm -rf dist
-rm -rf src/tvm_macropad.egg-info
-rm -rf src/tvm/__pycache__
-rm -f src/tvm/confirmation_patch.py
-rm -f setup.py
-```
 
 If files are already tracked by git:
 
 ```bash
-git rm -r build
-git rm -r dist
-git rm -r src/tvm_macropad.egg-info
-git rm -r src/tvm/__pycache__
-git rm src/tvm/confirmation_patch.py
-git rm setup.py
 ```
 
 ---
@@ -174,8 +147,8 @@ pip install -e .
 Run:
 
 ```bash
-python -m tvm
-tvm
+python -m termforge
+termforge
 ```
 
 Verify:

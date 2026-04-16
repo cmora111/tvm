@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tvm"
+name = "termforge"
 version = "0.2.4"
 description = "Terminal Virtual Macropad for Xorg terminals"
 readme = "README.md"
@@ -26,11 +26,11 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/cmora111/tvm"
-Issues = "https://github.com/cmora111/tvm/issues"
+Homepage = "https://github.com/cmora111/termforge"
+Issues = "https://github.com/cmora111/termforge/issues"
 
 [project.scripts]
-tvm = "tvm.cli:main"
+termforge = "termforge.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -39,4 +39,4 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-tvm = []
+termforge = []
