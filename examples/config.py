@@ -1,4 +1,4 @@
-# TermFore example configuration
+# TermForge example configuration
 # Copy to: ~/.config/termforge/config.py
 
 debug = {
@@ -19,11 +19,21 @@ terminal = {
 #
 # Placeholders like <name>, <user>, <host>, <path> will prompt for input.
 
+Window = {
+    'server': None,
+    'logs': None,
+}
+
+Hotkeys = {
+    '<ctrl>+<alt>+d': ['Admin_CMDs', 'Deploy'],
+    '<ctrl>+<alt>+l': ['Admin_CMDs', 'Logs'],
+    '<ctrl>+<alt>+p': ['Admin_CMDs', 'pwd'],
+}
+
 Categories = {
     'Select Window': {
         'Select window': [0, 'None'],
     },
-
     'Admin_CMDs': {
         'Deploy': ['chain', [
             ['select_profile', 'server'],
@@ -36,7 +46,7 @@ Categories = {
 
         'Logs': ['chain', [
             ['select_profile', 'logs'],
-            [2, 'tail -f /var/log/syslog'],
+            [2, 'tail -15 /var/log/syslog'],
         ]],
 
         'ls': [2, 'ls'],
@@ -44,8 +54,8 @@ Categories = {
         'pwd': [2, 'pwd'],
         'cd': [2, 'cd <path>'],
         'mkdir': [2, 'mkdir -p <path>'],
-        'ssh': [2, 'ssh <user>@<host>'],
-        'Danger Upgrade': [2, 'sudo apt upgrade -y', {'confirm': True}],
+        'ssh': [2, 'ssh -T <user>@<host>'],
+        'Danger Upgrade': [2, 'sudo apt update -y', {'confirm': True}],
     },
 
     'Applications': {
@@ -60,7 +70,7 @@ Categories = {
     'Chain CMDs': {
         'Quick Test': ['chain', [
             [2, 'pwd'],
-            [2, 'ls']
+            [2, 'ls'],
         ]],
 
         'SSH Prep': ['chain', [
@@ -73,12 +83,22 @@ Categories = {
             [2, 'sudo apt upgrade -y', {'confirm': True}],
         ]],
 
+        'Deploy Shared': ['chain', [
+            ['vars', ['path', 'user', 'host']],
+            ['select_profile', 'server'],
+            [2, 'cd <path>'],
+            ['sleep', 1],
+            [2, 'ssh -T <user>@<host>'],
+            [2, 'echo Deploying from <path>'],
+        ]],
+
         'Shared Test': ['chain', [
             ['vars', ['path']],
             [2, 'cd <path>'],
             [2, 'echo path is <path>'],
         ]],
     }
+
 }
 Favorites = [
     ["Admin_CMDs", "ls"],
@@ -87,3 +107,5 @@ Favorites = [
     ["Plugins", "Hello World Plugin"],
 ]
 
+
+Windows = {'server': 2118605}
