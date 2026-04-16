@@ -4,23 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "termforge"
-version = "0.3.3"
-description = "Terminal workflow engine for X11 terminals"
+version = "0.3.4"
+description = "Terminal workflow engine for X11 terminals (automation, macros, and command chains)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+
 authors = [
   { name = "Carlos Mora" }
 ]
+
 keywords = [
-  "tkinter",
+  "terminal",
+  "automation",
+  "workflow",
+  "macros",
   "x11",
   "xdotool",
-  "terminal",
-  "workflow",
-  "macropad",
-  "ubuntu"
+  "tkinter",
+  "linux",
+  "command-chains"
 ]
+
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: X11 Applications",
@@ -28,15 +33,18 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
   "Topic :: Utilities",
   "Topic :: System :: Shells",
   "Topic :: Desktop Environment",
 ]
 
+# ✅ Runtime dependencies
 dependencies = [
-  "pynput>=1.7.6",
+  "pynput>=1.7.6"
 ]
 
+# ✅ Optional dev tools
 [project.optional-dependencies]
 dev = [
   "build>=1.2.1",
@@ -46,15 +54,19 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/cmora111/termforge"
 Issues = "https://github.com/cmora111/termforge/issues"
+Source = "https://github.com/cmora111/termforge"
 
+# ✅ CLI entry point
 [project.scripts]
 termforge = "termforge.cli:main"
 
+# ✅ src/ layout
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# (Optional, safe placeholder)
 [tool.setuptools.package-data]
 termforge = []
