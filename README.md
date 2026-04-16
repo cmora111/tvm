@@ -14,6 +14,7 @@ Feature	What it gives you
 ⭐ Favorites	One-click access to key commands
 📜 History	Rerun previous commands instantly
 </p>
+
 🚀 Quick Example
 'Deploy': ['chain', [
     ['vars', ['path', 'user', 'host']],
@@ -40,6 +41,11 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 python -m termforge
+
+or
+
+termforge
+
 📁 Project Structure
 src/termforge/
     app.py
@@ -50,15 +56,18 @@ src/termforge/
 examples/
     config.py
     plugins/
+
 ⚠️ Requirements
 Linux (X11 — not Wayland)
 xdotool
 sudo apt install xdotool
+
 🧩 Plugin Example
 TermForge_PLUGIN_API_VERSION = 1
 
 def run(app, context):
     app.set_status("Hello from plugin!")
+
 📜 License
 
 MIT
