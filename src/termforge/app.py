@@ -644,6 +644,9 @@ class ChainBuilderWindow:
 
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
+        self.window.bind("<Delete>", lambda _e: self.delete_step())
+        self.value_text.bind("<Control-Return>", lambda _e: self.add_or_update_step())
+        self.value_text.bind("<Return>", self.on_return_key)
         self.update_kind_ui()
         self.refresh()
 
@@ -681,6 +684,16 @@ class ChainBuilderWindow:
         self.listbox.delete(0, END)
         for step in self.steps:
             self.listbox.insert(END, self.step_to_label(step))
+
+    def on_return_key(self, event):
+        kind = self.kind_var.get().strip().lower()
+
+        # For multi-line JSON entry like vars, keep normal Enter behavior
+        if kind == "vars":
+            return
+
+        self.add_or_update_step()
+        return "break"
 
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
