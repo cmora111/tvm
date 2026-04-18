@@ -1046,6 +1046,7 @@ class CategoryEditorWindow:
         Button(action_row, text="Create Category", width=16, bg="darkgreen", fg="white", command=self.create_category).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Rename Category", width=16, bg="#2f5597", fg="white", command=self.rename_category).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Delete Category", width=16, bg="#7f6000", fg="white", command=self.delete_category).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Move Command", width=16, bg="#444444", fg="white", command=self.move_command).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Refresh", width=16, bg="navy", fg="white", command=self.refresh).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
 
@@ -1166,6 +1167,79 @@ class CategoryEditorWindow:
         self.app.persist_categories()
         self.app.rebuild_category_buttons()
         self.app.set_status(f"Renamed category {old_name} -> {new_name}")
+        self.refresh()
+
+    def move_command(self):
+        source_category = self.selected_category_name()
+        if not source_category:
+            messagebox.showerror("Category Editor", "Select a source category first.")
+            return
+
+        categories = self.get_categories()
+        commands = categories.get(source_category, {})
+        if not isinstance(commands, dict) or not commands:
+            messagebox.showerror("Category Editor", "Selected category has no commands to move.")
+            return
+
+        # Step 1: choose command from source category
+        command_prompt = MultiFieldPrompt(
+            self.window,
+            "Move Command",
+            ["command_name", "target_category"],
+            heading=f"Move a command from '{source_category}'",
+        )
+        values = command_prompt.show()
+        if values is None:
+            return
+
+        command_name = values.get("command_name", "").strip()
+        target_category = values.get("target_category", "").strip()
+
+        if not command_name:
+            messagebox.showerror("Category Editor", "Command name is required.")
+            return
+
+        if command_name not in commands:
+            available = ", ".join(sorted(commands.keys()))
+            messagebox.showerror(
+                "Category Editor",
+                f"Command not found in {source_category}: {command_name}\n\nAvailable: {available}"
+            )
+            return
+
+        if not target_category:
+            messagebox.showerror("Category Editor", "Target category is required.")
+            return
+
+        if target_category == source_category:
+            messagebox.showerror("Category Editor", "Source and target categories are the same.")
+            return
+
+        if target_category not in categories:
+            if not messagebox.askokcancel(
+                "Create Category",
+                f"Target category '{target_category}' does not exist.\n\nCreate it?"
+            ):
+                return
+            categories[target_category] = {}
+
+        if not isinstance(categories[target_category], dict):
+            categories[target_category] = {}
+
+        if command_name in categories[target_category]:
+            if not messagebox.askokcancel(
+                "Overwrite Command",
+                f"'{command_name}' already exists in '{target_category}'.\n\nOverwrite it?"
+            ):
+                return
+
+        categories[target_category][command_name] = commands.pop(command_name)
+
+        self.app.persist_categories()
+        self.app.rebuild_category_buttons()
+        self.app.set_status(
+            f"Moved command {command_name} from {source_category} to {target_category}"
+        )
         self.refresh()
 
     def delete_category(self):
@@ -2126,6 +2200,8 @@ class TermForgeApp:
                 "Command:",
                 entry.get("command", ""),
             ]
+            lines.append("")
+            lines.append("Use 'Move Command' to move one of these into another category.")
             info.delete("1.0", END)
             info.insert("1.0", "\n".join(lines))
 
