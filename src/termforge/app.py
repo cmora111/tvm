@@ -122,8 +122,9 @@ class MultiFieldPrompt:
 
         self.window = Toplevel(parent)
         self.window.title(title)
-        self.window.resizable(False, False)
         self.window.transient(parent)
+        self.window.grab_set()
+        self.window.resizable(False, False)
         self.window.protocol("WM_DELETE_WINDOW", self.cancel)
 
         container = Frame(self.window, padx=10, pady=10)
@@ -154,41 +155,24 @@ class MultiFieldPrompt:
         Button(buttons, text="OK", width=12, bg="darkgreen", fg="white", command=self.submit).pack(side=LEFT)
         Button(buttons, text="Cancel", width=12, bg="red", fg="black", command=self.cancel).pack(side=RIGHT)
 
-        self.window.bind("<Return>", lambda _e: self.submit())
-        self.window.bind("<Escape>", lambda _e: self.cancel())
-
-        self.window.update_idletasks()
-        self.window.lift()
-        self.window.focus_force()
-
         if fields:
             self.entries[fields[0]].focus_set()
 
+        self.window.bind("<Return>", lambda _e: self.submit())
+        self.window.bind("<Escape>", lambda _e: self.cancel())
+
     def submit(self):
-        try:
-            self.result = {name: entry.get() for name, entry in self.entries.items()}
-        finally:
-            try:
-                self.window.grab_release()
-            except Exception:
-                pass
-            self.window.destroy()
+        self.result = {name: entry.get() for name, entry in self.entries.items()}
+        self.window.destroy()
 
     def cancel(self):
-        try:
-            self.result = None
-        finally:
-            try:
-                self.window.grab_release()
-            except Exception:
-                pass
-            self.window.destroy()
+        self.result = None
+        self.window.destroy()
 
     def show(self) -> dict[str, str] | None:
-        self.window.wait_visibility()
-        self.window.grab_set()
         self.parent.wait_window(self.window)
         return self.result
+
 
 class ChainRunnerWindow:
     def __init__(self, parent, total_steps: int):
@@ -644,14 +628,6 @@ class ChainBuilderWindow:
 
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
-        self.window.bind("<Delete>", lambda _e: self.delete_step())
-        self.value_text.bind("<Control-Return>", lambda _e: self.add_or_update_step())
-        self.value_text.bind("<Return>", self.on_return_key)
-
-        self.window.bind("<Control-d>", lambda _e: self.duplicate_step())
-        self.window.bind("<Alt-Up>", lambda _e: self.move_up())
-        self.window.bind("<Alt-Down>", lambda _e: self.move_down())
-
         self.update_kind_ui()
         self.refresh()
 
@@ -690,30 +666,6 @@ class ChainBuilderWindow:
         for step in self.steps:
             self.listbox.insert(END, self.step_to_label(step))
 
-    def on_return_key(self, event):
-        kind = self.kind_var.get().strip().lower()
-
-        # For multi-line JSON entry like vars, keep normal Enter behavior
-        if kind == "vars":
-            return
-
-        self.add_or_update_step()
-        return "break"
-
-    def duplicate_step_shortcut(self, event=None):
-        self.duplicate_step()
-        return "break"
-
-
-    def move_up_shortcut(self, event=None):
-        self.move_up()
-        return "break"
-
-
-    def move_down_shortcut(self, event=None):
-        self.move_down()
-        return "break"
-
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
         value = self.value_text.get("1.0", END).strip()
@@ -751,65 +703,29 @@ class ChainBuilderWindow:
         except Exception as exc:
             messagebox.showerror("Chain Builder", str(exc))
             return
-
         idxs = self.listbox.curselection()
         if idxs:
             self.steps[idxs[0]] = step
         else:
             self.steps.append(step)
-
         self.refresh()
-
-        # ✅ clear input after adding/updating
-        self.value_text.delete("1.0", END)
-
-        # optional: reset kind to default (comment out if you prefer to keep it)
-        self.kind_var.set("send")
-
-        # clear selection so next add is a new step
-        self.listbox.selection_clear(0, END)
 
     def duplicate_step(self):
         idxs = self.listbox.curselection()
         if not idxs:
             return
-
         step = self.steps[idxs[0]]
-
-        # deep copy (safe for nested lists)
         cloned = json.loads(json.dumps(step))
         self.steps.insert(idxs[0] + 1, cloned)
-
         self.refresh()
-
-        # optionally select the new duplicate
-        new_index = idxs[0] + 1
-        self.listbox.selection_set(new_index)
-
-        # load it briefly (optional)
-        # self.load_selected()
-
-        # ✅ clear input to avoid accidental edits
-        self.value_text.delete("1.0", END)
-        self.value_text.focus_set()
-
-        # clear selection if you prefer clean state:
-        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(idxs[0] + 1)
 
     def delete_step(self):
         idxs = self.listbox.curselection()
         if not idxs:
             return
-
         del self.steps[idxs[0]]
         self.refresh()
-
-        # ✅ clear input after delete
-        self.value_text.delete("1.0", END)
-        self.value_text.focus_set()
-
-        # clear selection so we don't accidentally edit wrong step
-        self.listbox.selection_clear(0, END)
 
     def move_up(self):
         idxs = self.listbox.curselection()
@@ -865,7 +781,7 @@ class ChainBuilderWindow:
 
     def close(self):
         self.result = None
-        return
+        self.window.destroy()
 
     def show(self):
         self.parent.wait_window(self.window)
@@ -1082,35 +998,196 @@ class CommandEditorWindow:
             categories[category] = {}
 
         categories[category][name] = entry
-
         self.app.persist_categories()
-        self.app.rebuild_category_buttons()
+        self.app.reload_from_config_with_notice(silent=True)
         self.app.set_status(f"Saved command {category}/{name}")
-
-        if self.window.winfo_exists() and self.listbox.winfo_exists():
-            self.refresh()
+        self.refresh()
 
     def delete_entry(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
         categories = getattr(self.app.cfg, "Categories", {})
-
         if category not in categories or name not in categories[category]:
             messagebox.showerror("Command Editor", "Selected command was not found.")
             return
-
         del categories[category][name]
         if not categories[category]:
             del categories[category]
-
         self.app.persist_categories()
-        self.app.rebuild_category_buttons()
+        self.app.reload_from_config_with_notice(silent=True)
         self.app.set_status(f"Deleted command {category}/{name}")
         self.clear_form()
+        self.refresh()
 
-        if self.window.winfo_exists() and self.listbox.winfo_exists():
-            self.refresh()
 
+class CategoryEditorWindow:
+    def __init__(self, app):
+        self.app = app
+        self.window = Toplevel(app.root)
+        self.window.title("Category Editor")
+        self.window.geometry("860x520")
+        self.window.transient(app.root)
+
+        outer = Frame(self.window, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text="Category Editor",
+            bd=4,
+            width=30,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
+        action_row = Frame(outer)
+        action_row.pack(fill=X, pady=(0, 8))
+        Button(action_row, text="Create Category", width=16, bg="darkgreen", fg="white", command=self.create_category).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Rename Category", width=16, bg="#2f5597", fg="white", command=self.rename_category).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Delete Category", width=16, bg="#7f6000", fg="white", command=self.delete_category).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Refresh", width=16, bg="navy", fg="white", command=self.refresh).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
+
+        body = Frame(outer)
+        body.pack(fill=BOTH, expand=True)
+
+        left = Frame(body)
+        left.pack(side=LEFT, fill=Y)
+
+        right = Frame(body)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(10, 0))
+
+        self.listbox = Listbox(left, width=38, height=22)
+        self.listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=self.listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.listbox.config(yscrollcommand=scrollbar.set)
+
+        self.info = Text(right, wrap="word", width=60, height=22)
+        self.info.pack(fill=BOTH, expand=True)
+
+        self.listbox.bind("<<ListboxSelect>>", self.show_selected)
+        self.refresh()
+
+    def get_categories(self):
+        categories = getattr(self.app.cfg, "Categories", {})
+        if not isinstance(categories, dict):
+            categories = {}
+            setattr(self.app.cfg, "Categories", categories)
+        return categories
+
+    def refresh(self):
+        self.listbox.delete(0, END)
+        categories = self.get_categories()
+        self.snapshot = []
+        for name in sorted(categories.keys()):
+            commands = categories.get(name, {})
+            count = len(commands) if isinstance(commands, dict) else 0
+            self.snapshot.append((name, count))
+            self.listbox.insert(END, f"{name} ({count} command{'s' if count != 1 else ''})")
+        self.info.delete("1.0", END)
+        self.info.insert("1.0", "Select a category to inspect.\n")
+
+    def show_selected(self, _event=None):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return
+        name, count = self.snapshot[idxs[0]]
+        commands = self.get_categories().get(name, {})
+        lines = [
+            f"Category: {name}",
+            f"Commands: {count}",
+            "",
+        ]
+        if isinstance(commands, dict) and commands:
+            lines.append("Entries:")
+            for command_name in sorted(commands.keys()):
+                lines.append(f"  - {command_name}")
+        else:
+            lines.append("This category is empty.")
+        self.info.delete("1.0", END)
+        self.info.insert("1.0", "\n".join(lines))
+
+    def selected_category_name(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return None
+        return self.snapshot[idxs[0]][0]
+
+    def create_category(self):
+        prompt = MultiFieldPrompt(
+            self.window,
+            "Create Category",
+            ["category_name"],
+            heading="Enter a new category name",
+        )
+        values = prompt.show()
+        if values is None:
+            return
+        name = values.get("category_name", "").strip()
+        if not name:
+            messagebox.showerror("Category Editor", "Category name is required.")
+            return
+        categories = self.get_categories()
+        if name in categories:
+            messagebox.showerror("Category Editor", f"Category already exists: {name}")
+            return
+        categories[name] = {}
+        self.app.persist_categories()
+        self.app.rebuild_category_buttons()
+        self.app.set_status(f"Created category {name}")
+        self.refresh()
+
+    def rename_category(self):
+        old_name = self.selected_category_name()
+        if not old_name:
+            messagebox.showerror("Category Editor", "Select a category to rename.")
+            return
+        prompt = MultiFieldPrompt(
+            self.window,
+            "Rename Category",
+            ["new_name"],
+            defaults={"new_name": old_name},
+            heading=f"Rename category '{old_name}'",
+        )
+        values = prompt.show()
+        if values is None:
+            return
+        new_name = values.get("new_name", "").strip()
+        if not new_name:
+            messagebox.showerror("Category Editor", "New category name is required.")
+            return
+        categories = self.get_categories()
+        if new_name != old_name and new_name in categories:
+            messagebox.showerror("Category Editor", f"Category already exists: {new_name}")
+            return
+        categories[new_name] = categories.pop(old_name)
+        self.app.persist_categories()
+        self.app.rebuild_category_buttons()
+        self.app.set_status(f"Renamed category {old_name} -> {new_name}")
+        self.refresh()
+
+    def delete_category(self):
+        name = self.selected_category_name()
+        if not name:
+            messagebox.showerror("Category Editor", "Select a category to delete.")
+            return
+        categories = self.get_categories()
+        commands = categories.get(name, {})
+        if isinstance(commands, dict) and commands:
+            messagebox.showerror(
+                "Category Editor",
+                "Category is not empty. Delete or move its commands first.",
+            )
+            return
+        if not messagebox.askokcancel("Delete Category", f"Delete empty category '{name}'?"):
+            return
+        del categories[name]
+        self.app.persist_categories()
+        self.app.rebuild_category_buttons()
+        self.app.set_status(f"Deleted category {name}")
+        self.refresh()
 
 class TermForgeApp:
     def __init__(self, root: Tk, cfg) -> None:
@@ -1193,30 +1270,6 @@ class TermForgeApp:
         finally:
             self.root.destroy()
 
-    def show_shortcuts(self) -> None:
-        lines = [
-            "TermForge Shortcuts",
-            "",
-            "Chain Builder:",
-            "  Enter       -> Add / Update Step",
-            "  Ctrl+Enter  -> Force Add / Update Step",
-            "  Delete      -> Delete selected step",
-            "  Ctrl+D      -> Duplicate selected step",
-            "  Alt+Up      -> Move selected step up",
-            "  Alt+Down    -> Move selected step down",
-            "",
-            "Global Hotkeys:",
-        ]
-
-        hotkeys = self.get_valid_hotkeys()
-        if hotkeys:
-            for hotkey, (category, command) in sorted(hotkeys.items()):
-                lines.append(f"  {hotkey} -> {category} / {command}")
-        else:
-            lines.append("  No global hotkeys configured.")
-
-        messagebox.showinfo("Shortcuts", "\n".join(lines))
-
     def add_history_entry(self, action_type, command_text, source="manual") -> None:
         entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1270,6 +1323,27 @@ class TermForgeApp:
         except Exception as exc:
             self.log(f"Could not persist window profiles: {exc}")
 
+    def rebuild_category_buttons(self) -> None:
+        if not hasattr(self, "categories_frame"):
+            return
+
+        for child in self.categories_frame.winfo_children():
+            child.destroy()
+
+        self.category_buttons = {}
+        categories = getattr(self.cfg, "Categories", {})
+
+        for category in categories:
+            btn = Button(
+                self.categories_frame,
+                text=category,
+                width=28,
+                bg="black",
+                fg="yellow",
+                command=lambda c=category: self.open_category(c),
+            )
+            btn.pack(pady=2)
+            self.category_buttons[category] = btn
 
     def get_hotkeys_dict(self) -> dict:
         hotkeys = getattr(self.cfg, "Hotkeys", None)
@@ -1277,6 +1351,27 @@ class TermForgeApp:
             hotkeys = {}
             setattr(self.cfg, "Hotkeys", hotkeys)
         return hotkeys
+
+
+    def persist_hotkeys(self) -> None:
+        hotkeys = self.get_hotkeys_dict()
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(hotkeys, indent=4)
+            if re.search(r"(?m)^Hotkeys\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Hotkeys = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nHotkeys = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist hotkeys: {exc}")
+
+    def open_hotkey_editor(self) -> None:
+        HotkeyEditorWindow(self)
 
 
     def persist_hotkeys(self) -> None:
@@ -1334,28 +1429,6 @@ class TermForgeApp:
             disabled.remove(name)
             self.persist_disabled_plugins()
         self.load_plugins(force=True)
-
-    def rebuild_category_buttons(self) -> None:
-        if not hasattr(self, "categories_frame"):
-            return
-
-        for child in self.categories_frame.winfo_children():
-            child.destroy()
-
-        self.category_buttons = {}
-        categories = getattr(self.cfg, "Categories", {})
-
-        for category in categories:
-            btn = Button(
-                self.categories_frame,
-                text=category,
-                width=28,
-                bg="black",
-                fg="yellow",
-                command=lambda c=category: self.open_category(c),
-            )
-            btn.pack(pady=2)
-            self.category_buttons[category] = btn
 
     def open_hotkey_editor(self) -> None:
         HotkeyEditorWindow(self)
@@ -2086,6 +2159,7 @@ class TermForgeApp:
         return parse_command_entry(entry)
 
     def persist_categories(self) -> None:
+        categories = getattr(self.cfg, "Categories", {})
         try:
             text = CONFIG_FILE.read_text(encoding="utf-8")
             rendered = pprint.pformat(categories, indent=4)
@@ -2121,6 +2195,10 @@ class TermForgeApp:
     def open_command_editor(self) -> None:
         CommandEditorWindow(self)
 
+
+    def open_category_editor(self) -> None:
+        CategoryEditorWindow(self)
+
     def build_menu(self) -> None:
         menubar = Menu(self.root)
 
@@ -2135,6 +2213,7 @@ class TermForgeApp:
         tools_menu.add_separator()
         tools_menu.add_command(label="History", command=self.open_history_window)
         tools_menu.add_separator()
+        tools_menu.add_command(label="Category Editor", command=self.open_category_editor)
         tools_menu.add_command(label="Command / Chain Editor", command=self.open_command_editor)
         tools_menu.add_separator()
         tools_menu.add_command(label="Plugin Manager", command=self.open_plugin_manager)
@@ -2146,10 +2225,8 @@ class TermForgeApp:
         menubar.add_cascade(label="Tools", menu=tools_menu)
 
         help_menu = Menu(menubar, tearoff=0)
-#         help_menu.add_command(label="About TermForge", command=self.show_about)
-        menubar.add_cascade(label="Help", menu=help_menu)
         help_menu.add_command(label="About TermForge", command=self.show_about)
-        help_menu.add_command(label="Shortcuts", command=self.show_shortcuts)
+        menubar.add_cascade(label="Help", menu=help_menu)
 
         self.root.config(menu=menubar)
 
