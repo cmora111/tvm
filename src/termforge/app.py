@@ -122,9 +122,8 @@ class MultiFieldPrompt:
 
         self.window = Toplevel(parent)
         self.window.title(title)
-        self.window.transient(parent)
-        self.window.grab_set()
         self.window.resizable(False, False)
+        self.window.transient(parent)
         self.window.protocol("WM_DELETE_WINDOW", self.cancel)
 
         container = Frame(self.window, padx=10, pady=10)
@@ -155,24 +154,41 @@ class MultiFieldPrompt:
         Button(buttons, text="OK", width=12, bg="darkgreen", fg="white", command=self.submit).pack(side=LEFT)
         Button(buttons, text="Cancel", width=12, bg="red", fg="black", command=self.cancel).pack(side=RIGHT)
 
-        if fields:
-            self.entries[fields[0]].focus_set()
-
         self.window.bind("<Return>", lambda _e: self.submit())
         self.window.bind("<Escape>", lambda _e: self.cancel())
 
+        self.window.update_idletasks()
+        self.window.lift()
+        self.window.focus_force()
+
+        if fields:
+            self.entries[fields[0]].focus_set()
+
     def submit(self):
-        self.result = {name: entry.get() for name, entry in self.entries.items()}
-        return
+        try:
+            self.result = {name: entry.get() for name, entry in self.entries.items()}
+        finally:
+            try:
+                self.window.grab_release()
+            except Exception:
+                pass
+            self.window.destroy()
 
     def cancel(self):
-        self.result = None
-        return
+        try:
+            self.result = None
+        finally:
+            try:
+                self.window.grab_release()
+            except Exception:
+                pass
+            self.window.destroy()
 
     def show(self) -> dict[str, str] | None:
+        self.window.wait_visibility()
+        self.window.grab_set()
         self.parent.wait_window(self.window)
         return self.result
-
 
 class ChainRunnerWindow:
     def __init__(self, parent, total_steps: int):
@@ -703,29 +719,65 @@ class ChainBuilderWindow:
         except Exception as exc:
             messagebox.showerror("Chain Builder", str(exc))
             return
+
         idxs = self.listbox.curselection()
         if idxs:
             self.steps[idxs[0]] = step
         else:
             self.steps.append(step)
+
         self.refresh()
+
+        # ✅ clear input after adding/updating
+        self.value_text.delete("1.0", END)
+
+        # optional: reset kind to default (comment out if you prefer to keep it)
+        self.kind_var.set("send")
+
+        # clear selection so next add is a new step
+        self.listbox.selection_clear(0, END)
 
     def duplicate_step(self):
         idxs = self.listbox.curselection()
         if not idxs:
             return
+
         step = self.steps[idxs[0]]
+
+        # deep copy (safe for nested lists)
         cloned = json.loads(json.dumps(step))
         self.steps.insert(idxs[0] + 1, cloned)
+
         self.refresh()
-        self.listbox.selection_set(idxs[0] + 1)
+
+        # optionally select the new duplicate
+        new_index = idxs[0] + 1
+        self.listbox.selection_set(new_index)
+
+        # load it briefly (optional)
+        # self.load_selected()
+
+        # ✅ clear input to avoid accidental edits
+        self.value_text.delete("1.0", END)
+        self.value_text.focus_set()
+
+        # clear selection if you prefer clean state:
+        self.listbox.selection_clear(0, END)
 
     def delete_step(self):
         idxs = self.listbox.curselection()
         if not idxs:
             return
+
         del self.steps[idxs[0]]
         self.refresh()
+
+        # ✅ clear input after delete
+        self.value_text.delete("1.0", END)
+        self.value_text.focus_set()
+
+        # clear selection so we don't accidentally edit wrong step
+        self.listbox.selection_clear(0, END)
 
     def move_up(self):
         idxs = self.listbox.curselection()
