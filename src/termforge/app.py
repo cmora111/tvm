@@ -163,11 +163,11 @@ class MultiFieldPrompt:
 
     def submit(self):
         self.result = {name: entry.get() for name, entry in self.entries.items()}
-        self.window.destroy()
+        return
 
     def cancel(self):
         self.result = None
-        self.window.destroy()
+        return
 
     def show(self) -> dict[str, str] | None:
         self.parent.wait_window(self.window)
@@ -781,7 +781,7 @@ class ChainBuilderWindow:
 
     def close(self):
         self.result = None
-        self.window.destroy()
+        return
 
     def show(self):
         self.parent.wait_window(self.window)
