@@ -647,6 +647,11 @@ class ChainBuilderWindow:
         self.window.bind("<Delete>", lambda _e: self.delete_step())
         self.value_text.bind("<Control-Return>", lambda _e: self.add_or_update_step())
         self.value_text.bind("<Return>", self.on_return_key)
+
+        self.window.bind("<Control-d>", lambda _e: self.duplicate_step())
+        self.window.bind("<Alt-Up>", lambda _e: self.move_up())
+        self.window.bind("<Alt-Down>", lambda _e: self.move_down())
+
         self.update_kind_ui()
         self.refresh()
 
@@ -693,6 +698,20 @@ class ChainBuilderWindow:
             return
 
         self.add_or_update_step()
+        return "break"
+
+    def duplicate_step_shortcut(self, event=None):
+        self.duplicate_step()
+        return "break"
+
+
+    def move_up_shortcut(self, event=None):
+        self.move_up()
+        return "break"
+
+
+    def move_down_shortcut(self, event=None):
+        self.move_down()
         return "break"
 
     def parse_current_step(self):
@@ -1173,6 +1192,30 @@ class TermForgeApp:
             self.root.quit()
         finally:
             self.root.destroy()
+
+    def show_shortcuts(self) -> None:
+        lines = [
+            "TermForge Shortcuts",
+            "",
+            "Chain Builder:",
+            "  Enter       -> Add / Update Step",
+            "  Ctrl+Enter  -> Force Add / Update Step",
+            "  Delete      -> Delete selected step",
+            "  Ctrl+D      -> Duplicate selected step",
+            "  Alt+Up      -> Move selected step up",
+            "  Alt+Down    -> Move selected step down",
+            "",
+            "Global Hotkeys:",
+        ]
+
+        hotkeys = self.get_valid_hotkeys()
+        if hotkeys:
+            for hotkey, (category, command) in sorted(hotkeys.items()):
+                lines.append(f"  {hotkey} -> {category} / {command}")
+        else:
+            lines.append("  No global hotkeys configured.")
+
+        messagebox.showinfo("Shortcuts", "\n".join(lines))
 
     def add_history_entry(self, action_type, command_text, source="manual") -> None:
         entry = {
@@ -2103,8 +2146,10 @@ class TermForgeApp:
         menubar.add_cascade(label="Tools", menu=tools_menu)
 
         help_menu = Menu(menubar, tearoff=0)
-        help_menu.add_command(label="About TermForge", command=self.show_about)
+#         help_menu.add_command(label="About TermForge", command=self.show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About TermForge", command=self.show_about)
+        help_menu.add_command(label="Shortcuts", command=self.show_shortcuts)
 
         self.root.config(menu=menubar)
 
