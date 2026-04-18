@@ -29,6 +29,7 @@ from tkinter import (
     Label,
     Listbox,
     Menu,
+    OptionMenu,
     Scrollbar,
     StringVar,
     Text,
@@ -534,22 +535,30 @@ class PluginManagerWindow:
         self.refresh()
 
 
-class CommandEditorWindow:
-    def __init__(self, app):
-        self.app = app
-        self.window = Toplevel(app.root)
-        self.window.title("Command / Chain Editor")
-        self.window.geometry("1000x620")
-        self.window.transient(app.root)
+
+
+class ChainBuilderWindow:
+    STEP_KINDS = ["vars", "select_profile", "sleep", "send", "spawn", "detached"]
+
+    def __init__(self, parent, initial_steps=None):
+        self.parent = parent
+        self.result = None
+        self.window = Toplevel(parent)
+        self.window.title("Visual Chain Builder")
+        self.window.geometry("980x640")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        self.steps = list(initial_steps or [])
 
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
         Label(
             outer,
-            text="Command / Chain Editor",
+            text="Visual Chain Builder",
             bd=4,
-            width=34,
+            width=32,
             bg="lightgreen",
             fg="black",
             relief="raised",
@@ -573,6 +582,259 @@ class CommandEditorWindow:
         form = Frame(right)
         form.pack(fill=X)
 
+        Label(form, text="Step Kind:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
+        self.kind_var = StringVar(value="send")
+        kind_menu = OptionMenu(form, self.kind_var, *self.STEP_KINDS)
+        kind_menu.config(width=38)
+        kind_menu.grid(row=0, column=1, sticky="w", pady=3)
+
+        self.value_label = Label(form, text="Value:", width=14, anchor="nw")
+        self.value_label.grid(row=1, column=0, sticky="nw", pady=3)
+        self.value_text = Text(form, height=7, width=70, wrap="word")
+        self.value_text.grid(row=1, column=1, sticky="nsew", pady=3)
+
+        self.hint_var = StringVar(value="")
+        Label(form, textvariable=self.hint_var, anchor="w", fg="#333333").grid(row=2, column=1, sticky="w", pady=(0, 6))
+
+        help_box = Text(right, height=14, wrap="word")
+        help_box.pack(fill=BOTH, expand=True, pady=(10, 0))
+        help_box.insert(
+            "1.0",
+            "Kinds:\n"
+            "  vars            value = JSON list, e.g. [\"path\", \"host\"]\n"
+            "  select_profile  value = profile name, e.g. server\n"
+            "  sleep           value = seconds, e.g. 1\n"
+            "  send            value = terminal command, becomes [2, \"...\"]\n"
+            "  spawn           value = new terminal command, becomes [1, \"...\"]\n"
+            "  detached        value = detached command, becomes [3, \"...\"]\n\n"
+            "Examples:\n"
+            "  kind=vars\n"
+            "  value=[\"path\", \"host\"]\n\n"
+            "  kind=send\n"
+            "  value=cd <path>\n"
+        )
+        help_box.config(state="disabled")
+
+        btns = Frame(outer)
+        btns.pack(fill=X, pady=(10, 0))
+        Button(btns, text="Add / Update Step", width=16, bg="darkgreen", fg="white", command=self.add_or_update_step).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Duplicate Step", width=14, bg="#555555", fg="white", command=self.duplicate_step).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Delete Step", width=14, bg="#7f6000", fg="white", command=self.delete_step).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Move Up", width=12, bg="#444444", fg="white", command=self.move_up).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Move Down", width=12, bg="#444444", fg="white", command=self.move_down).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Apply to Editor", width=14, bg="navy", fg="white", command=self.apply_and_close).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Close", width=12, bg="red", fg="black", command=self.close).pack(side=RIGHT)
+
+        self.kind_var.trace_add("write", self.update_kind_ui)
+        self.listbox.bind("<<ListboxSelect>>", self.on_select)
+        self.update_kind_ui()
+        self.refresh()
+
+    def update_kind_ui(self, *_args):
+        kind = self.kind_var.get().strip().lower()
+        if kind == "vars":
+            self.value_label.config(text="Vars JSON:")
+            self.hint_var.set('Enter a JSON list, e.g. ["path", "host"]')
+        elif kind == "select_profile":
+            self.value_label.config(text="Profile:")
+            self.hint_var.set("Enter a saved window profile name, e.g. server")
+        elif kind == "sleep":
+            self.value_label.config(text="Seconds:")
+            self.hint_var.set("Enter a number, e.g. 1 or 0.5")
+        elif kind == "send":
+            self.value_label.config(text="Command:")
+            self.hint_var.set("Plain text terminal command sent to selected window")
+        elif kind == "spawn":
+            self.value_label.config(text="Command:")
+            self.hint_var.set("Plain text command run in a new terminal")
+        elif kind == "detached":
+            self.value_label.config(text="Command:")
+            self.hint_var.set("Plain text detached command run in background")
+        else:
+            self.value_label.config(text="Value:")
+            self.hint_var.set("")
+
+    def step_to_label(self, step):
+        if isinstance(step, (list, tuple)) and step:
+            kind = step[0]
+            return f"{kind}: {step!r}"
+        return repr(step)
+
+    def refresh(self):
+        self.listbox.delete(0, END)
+        for step in self.steps:
+            self.listbox.insert(END, self.step_to_label(step))
+
+    def parse_current_step(self):
+        kind = self.kind_var.get().strip().lower()
+        value = self.value_text.get("1.0", END).strip()
+        if not kind:
+            raise ValueError("Step kind is required.")
+
+        if kind == "vars":
+            parsed = json.loads(value)
+            if not isinstance(parsed, list):
+                raise ValueError("vars value must be a JSON list.")
+            return ["vars", parsed]
+        if kind == "select_profile":
+            if not value:
+                raise ValueError("Profile name is required.")
+            return ["select_profile", value]
+        if kind == "sleep":
+            if not value:
+                raise ValueError("Sleep seconds are required.")
+            try:
+                num = int(value)
+            except ValueError:
+                num = float(value)
+            return ["sleep", num]
+        if kind == "send":
+            return [2, value]
+        if kind == "spawn":
+            return [1, value]
+        if kind == "detached":
+            return [3, value]
+        raise ValueError("Unknown step kind.")
+
+    def add_or_update_step(self):
+        try:
+            step = self.parse_current_step()
+        except Exception as exc:
+            messagebox.showerror("Chain Builder", str(exc))
+            return
+        idxs = self.listbox.curselection()
+        if idxs:
+            self.steps[idxs[0]] = step
+        else:
+            self.steps.append(step)
+        self.refresh()
+
+    def duplicate_step(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return
+        step = self.steps[idxs[0]]
+        cloned = json.loads(json.dumps(step))
+        self.steps.insert(idxs[0] + 1, cloned)
+        self.refresh()
+        self.listbox.selection_set(idxs[0] + 1)
+
+    def delete_step(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return
+        del self.steps[idxs[0]]
+        self.refresh()
+
+    def move_up(self):
+        idxs = self.listbox.curselection()
+        if not idxs or idxs[0] == 0:
+            return
+        i = idxs[0]
+        self.steps[i-1], self.steps[i] = self.steps[i], self.steps[i-1]
+        self.refresh()
+        self.listbox.selection_set(i-1)
+
+    def move_down(self):
+        idxs = self.listbox.curselection()
+        if not idxs or idxs[0] >= len(self.steps) - 1:
+            return
+        i = idxs[0]
+        self.steps[i+1], self.steps[i] = self.steps[i], self.steps[i+1]
+        self.refresh()
+        self.listbox.selection_set(i+1)
+
+    def on_select(self, _event=None):
+        self.load_selected()
+
+    def load_selected(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return
+        step = self.steps[idxs[0]]
+        self.value_text.delete("1.0", END)
+        if isinstance(step, (list, tuple)) and step:
+            if step[0] == "vars":
+                self.kind_var.set("vars")
+                self.value_text.insert("1.0", json.dumps(step[1], indent=2))
+            elif step[0] == "select_profile":
+                self.kind_var.set("select_profile")
+                self.value_text.insert("1.0", str(step[1]))
+            elif step[0] == "sleep":
+                self.kind_var.set("sleep")
+                self.value_text.insert("1.0", str(step[1]))
+            elif step[0] == 2:
+                self.kind_var.set("send")
+                self.value_text.insert("1.0", str(step[1]))
+            elif step[0] == 1:
+                self.kind_var.set("spawn")
+                self.value_text.insert("1.0", str(step[1]))
+            elif step[0] == 3:
+                self.kind_var.set("detached")
+                self.value_text.insert("1.0", str(step[1]))
+        self.update_kind_ui()
+
+    def apply_and_close(self):
+        self.result = list(self.steps)
+        self.window.destroy()
+
+    def close(self):
+        self.result = None
+        self.window.destroy()
+
+    def show(self):
+        self.parent.wait_window(self.window)
+        return self.result
+
+
+class CommandEditorWindow:
+    def __init__(self, app):
+        self.app = app
+        self.window = Toplevel(app.root)
+        self.window.title("Command / Chain Editor")
+        self.window.geometry("1040x700")
+        self.window.transient(app.root)
+
+        outer = Frame(self.window, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text="Command / Chain Editor",
+            bd=4,
+            width=34,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
+        action_row = Frame(outer)
+        action_row.pack(fill=X, pady=(0, 8))
+        Button(action_row, text="Save Entry", width=16, bg="darkgreen", fg="white", command=self.save_entry).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Delete Entry", width=16, bg="#7f6000", fg="white", command=self.delete_entry).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="New / Clear", width=16, bg="#555555", fg="white", command=self.clear_form).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Refresh List", width=16, bg="navy", fg="white", command=self.refresh).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
+
+        top = Frame(outer)
+        top.pack(fill=BOTH, expand=True)
+
+        left = Frame(top)
+        left.pack(side=LEFT, fill=Y)
+
+        right = Frame(top)
+        right.pack(side=RIGHT, fill=BOTH, expand=True, padx=(10, 0))
+
+        self.listbox = Listbox(left, width=42, height=26)
+        self.listbox.pack(side=LEFT, fill=Y)
+        scrollbar = Scrollbar(left, command=self.listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.listbox.config(yscrollcommand=scrollbar.set)
+
+        form = Frame(right)
+        form.pack(fill=X)
+
         Label(form, text="Category:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
         self.category_var = StringVar()
         Entry(form, textvariable=self.category_var, width=42).grid(row=0, column=1, sticky="ew", pady=3)
@@ -583,15 +845,24 @@ class CommandEditorWindow:
 
         Label(form, text="Type:", width=14, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
         self.type_var = StringVar(value="2")
-        Entry(form, textvariable=self.type_var, width=42).grid(row=2, column=1, sticky="ew", pady=3)
+        self.type_entry = Entry(form, textvariable=self.type_var, width=42)
+        self.type_entry.grid(row=2, column=1, sticky="ew", pady=3)
 
-        Label(form, text="Command / JSON:", width=14, anchor="nw").grid(row=3, column=0, sticky="nw", pady=3)
+        self.command_label = Label(form, text="Command:", width=14, anchor="nw")
+        self.command_label.grid(row=3, column=0, sticky="nw", pady=3)
         self.command_text = Text(form, height=14, width=70, wrap="word")
         self.command_text.grid(row=3, column=1, sticky="nsew", pady=3)
 
-        Label(form, text="Options JSON:", width=14, anchor="nw").grid(row=4, column=0, sticky="nw", pady=3)
+        builder_row = Frame(form)
+        builder_row.grid(row=4, column=1, sticky="w", pady=(0, 6))
+        self.builder_button = Button(builder_row, text="Visual Chain Builder", bg="#2f5597", fg="white", command=self.open_chain_builder)
+        self.builder_button.pack(side=LEFT)
+        self.chain_hint = Label(builder_row, text="Use this for type = chain", fg="#333333")
+        self.chain_hint.pack(side=LEFT, padx=(8, 0))
+
+        Label(form, text="Options JSON:", width=14, anchor="nw").grid(row=5, column=0, sticky="nw", pady=3)
         self.options_text = Text(form, height=5, width=70, wrap="word")
-        self.options_text.grid(row=4, column=1, sticky="nsew", pady=3)
+        self.options_text.grid(row=5, column=1, sticky="nsew", pady=3)
 
         form.grid_columnconfigure(1, weight=1)
 
@@ -599,40 +870,50 @@ class CommandEditorWindow:
         help_box.pack(fill=BOTH, expand=True, pady=(10, 0))
         help_box.insert(
             "1.0",
-            "Examples:\n\n"
-            "Simple send command:\n"
+            "Simple command:\n"
             "  Type: 2\n"
             "  Command: pwd\n\n"
             "Detached command:\n"
             "  Type: 3\n"
             "  Command: code > /dev/null 2>&1 &\n\n"
-            "Chain command:\n"
+            "Chain:\n"
             "  Type: chain\n"
-            "  Command / JSON:\n"
-            "  [\n"
-            "    [\"vars\", [\"path\", \"host\"]],\n"
-            "    [\"select_profile\", \"server\"],\n"
-            "    [2, \"cd <path>\"],\n"
-            "    [\"sleep\", 1],\n"
-            "    [2, \"ssh <host>\"]\n"
-            "  ]\n\n"
+            "  Use the Visual Chain Builder button\n\n"
             "Options JSON example:\n"
             "  {\"confirm\": true}\n"
         )
         help_box.config(state="disabled")
 
-        button_row = Frame(outer)
-        button_row.pack(fill=X, pady=(10, 0))
-        Button(button_row, text="Load Selected", width=16, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
-        Button(button_row, text="New / Clear", width=16, bg="#555555", fg="white", command=self.clear_form).pack(side=LEFT, padx=(0, 6))
-        Button(button_row, text="Save Entry", width=16, bg="darkgreen", fg="white", command=self.save_entry).pack(side=LEFT, padx=(0, 6))
-        Button(button_row, text="Delete Entry", width=16, bg="#7f6000", fg="white", command=self.delete_entry).pack(side=LEFT, padx=(0, 6))
-        Button(button_row, text="Refresh List", width=16, bg="navy", fg="white", command=self.refresh).pack(side=LEFT, padx=(0, 6))
-        Button(button_row, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
-
         self.snapshot = []
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
+        self.type_var.trace_add("write", self.update_type_ui)
         self.refresh()
+        self.clear_form()
+
+    def update_type_ui(self, *_args):
+        cmd_type_raw = self.type_var.get().strip().lower()
+        if cmd_type_raw == "chain":
+            self.command_label.config(text="Chain JSON:")
+            self.builder_button.config(state="normal")
+            self.chain_hint.config(text="Build visually or edit JSON directly")
+        else:
+            self.command_label.config(text="Command:")
+            self.builder_button.config(state="disabled")
+            self.chain_hint.config(text="Plain text command for normal entries")
+
+    def open_chain_builder(self):
+        current = self.command_text.get("1.0", END).strip()
+        initial = []
+        if current:
+            try:
+                initial = json.loads(current)
+            except Exception:
+                initial = []
+        builder = ChainBuilderWindow(self.window, initial_steps=initial)
+        result = builder.show()
+        if result is not None:
+            self.command_text.delete("1.0", END)
+            self.command_text.insert("1.0", json.dumps(result, indent=2))
 
     def refresh(self):
         self.snapshot.clear()
@@ -663,9 +944,7 @@ class CommandEditorWindow:
             self.command_text.insert("1.0", json.dumps(cmd, indent=2))
         self.options_text.delete("1.0", END)
         self.options_text.insert("1.0", json.dumps(options, indent=2) if options else "{}")
-
-    def load_selected(self):
-        self.on_select()
+        self.update_type_ui()
 
     def clear_form(self):
         self.category_var.set("")
@@ -674,6 +953,7 @@ class CommandEditorWindow:
         self.command_text.delete("1.0", END)
         self.options_text.delete("1.0", END)
         self.options_text.insert("1.0", "{}")
+        self.update_type_ui()
 
     def _parse_form(self):
         category = self.category_var.get().strip()
@@ -687,7 +967,9 @@ class CommandEditorWindow:
 
         if cmd_type_raw.lower() == "chain":
             cmd_type = "chain"
-            command = json.loads(command_raw)
+            command = json.loads(command_raw) if command_raw else []
+            if not isinstance(command, list):
+                raise ValueError("Chain JSON must decode to a list.")
         else:
             try:
                 cmd_type = int(cmd_type_raw)
@@ -716,26 +998,35 @@ class CommandEditorWindow:
             categories[category] = {}
 
         categories[category][name] = entry
+
         self.app.persist_categories()
-        self.app.reload_from_config_with_notice(silent=True)
+        self.app.rebuild_category_buttons()
         self.app.set_status(f"Saved command {category}/{name}")
-        self.refresh()
+
+        if self.window.winfo_exists() and self.listbox.winfo_exists():
+            self.refresh()
 
     def delete_entry(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
         categories = getattr(self.app.cfg, "Categories", {})
+
         if category not in categories or name not in categories[category]:
             messagebox.showerror("Command Editor", "Selected command was not found.")
             return
+
         del categories[category][name]
         if not categories[category]:
             del categories[category]
+
         self.app.persist_categories()
-        self.app.reload_from_config_with_notice(silent=True)
+        self.app.rebuild_category_buttons()
         self.app.set_status(f"Deleted command {category}/{name}")
         self.clear_form()
-        self.refresh()
+
+        if self.window.winfo_exists() and self.listbox.winfo_exists():
+            self.refresh()
+
 
 class TermForgeApp:
     def __init__(self, root: Tk, cfg) -> None:
@@ -897,27 +1188,6 @@ class TermForgeApp:
         except Exception as exc:
             self.log(f"Could not persist hotkeys: {exc}")
 
-    def open_hotkey_editor(self) -> None:
-        HotkeyEditorWindow(self)
-
-
-    def persist_hotkeys(self) -> None:
-        hotkeys = self.get_hotkeys_dict()
-        try:
-            text = CONFIG_FILE.read_text(encoding="utf-8")
-            rendered = pprint.pformat(hotkeys, indent=4)
-            if re.search(r"(?m)^Hotkeys\s*=", text):
-                text = re.sub(
-                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
-                    f"Hotkeys = {rendered}\n",
-                    text,
-                )
-            else:
-                text += f"\n\nHotkeys = {rendered}\n"
-            CONFIG_FILE.write_text(text, encoding="utf-8")
-        except Exception as exc:
-            self.log(f"Could not persist hotkeys: {exc}")
-
     def get_disabled_plugins(self) -> list[str]:
         disabled = getattr(self.cfg, "DisabledPlugins", None)
         if disabled is None or not isinstance(disabled, list):
@@ -956,6 +1226,28 @@ class TermForgeApp:
             disabled.remove(name)
             self.persist_disabled_plugins()
         self.load_plugins(force=True)
+
+    def rebuild_category_buttons(self) -> None:
+        if not hasattr(self, "categories_frame"):
+            return
+
+        for child in self.categories_frame.winfo_children():
+            child.destroy()
+
+        self.category_buttons = {}
+        categories = getattr(self.cfg, "Categories", {})
+
+        for category in categories:
+            btn = Button(
+                self.categories_frame,
+                text=category,
+                width=28,
+                bg="black",
+                fg="yellow",
+                command=lambda c=category: self.open_category(c),
+            )
+            btn.pack(pady=2)
+            self.category_buttons[category] = btn
 
     def open_hotkey_editor(self) -> None:
         HotkeyEditorWindow(self)
@@ -1686,7 +1978,6 @@ class TermForgeApp:
         return parse_command_entry(entry)
 
     def persist_categories(self) -> None:
-        categories = getattr(self.cfg, "Categories", {})
         try:
             text = CONFIG_FILE.read_text(encoding="utf-8")
             rendered = pprint.pformat(categories, indent=4)
@@ -1801,13 +2092,13 @@ class TermForgeApp:
         self.search_var.trace_add("write", self.update_category_filter)
         search_entry.bind("<Return>", self.open_search_results)
 
-        categories_frame = Frame(frame)
-        categories_frame.pack()
+        self.categories_frame = Frame(frame)
+        self.categories_frame.pack()
         self.category_buttons = {}
         categories = getattr(self.cfg, "Categories", {})
         for category in categories:
             btn = Button(
-                categories_frame,
+                self.categories_frame,
                 text=category,
                 width=28,
                 bg="black",
