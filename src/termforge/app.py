@@ -36,6 +36,7 @@ from tkinter import (
     Tk,
     Toplevel,
     messagebox,
+    OptionMenu,
 )
 
 APP_NAME = "TermForge"
@@ -1019,6 +1020,72 @@ class CommandEditorWindow:
         self.clear_form()
         self.refresh()
 
+class MoveCommandDialog:
+    def __init__(self, parent, source_category: str, commands: list[str], categories: list[str]):
+        self.result = None
+        self.window = Toplevel(parent)
+        self.window.title("Move Command")
+        self.window.transient(parent)
+        self.window.grab_set()
+        self.window.resizable(False, False)
+        self.window.protocol("WM_DELETE_WINDOW", self.cancel)
+
+        outer = Frame(self.window, padx=10, pady=10)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text=f"Move command from '{source_category}'",
+            bd=2,
+            relief="groove",
+            width=34,
+            bg="lightgreen",
+            fg="black",
+        ).pack(pady=(0, 10))
+
+        row1 = Frame(outer)
+        row1.pack(fill=X, pady=3)
+        Label(row1, text="Command:", width=14, anchor="w").pack(side=LEFT)
+        self.command_var = StringVar(value=commands[0] if commands else "")
+        OptionMenu(row1, self.command_var, *(commands if commands else [""])).pack(side=RIGHT, fill=X, expand=True)
+
+        row2 = Frame(outer)
+        row2.pack(fill=X, pady=3)
+        Label(row2, text="Target Category:", width=14, anchor="w").pack(side=LEFT)
+        target_choices = categories if categories else [""]
+        self.target_var = StringVar(value=target_choices[0])
+        OptionMenu(row2, self.target_var, *target_choices).pack(side=RIGHT, fill=X, expand=True)
+
+        buttons = Frame(outer)
+        buttons.pack(fill=X, pady=(12, 0))
+        Button(buttons, text="OK", width=12, bg="darkgreen", fg="white", command=self.submit).pack(side=LEFT)
+        Button(buttons, text="Cancel", width=12, bg="red", fg="black", command=self.cancel).pack(side=RIGHT)
+
+    def submit(self):
+        self.result = {
+            "command_name": self.command_var.get().strip(),
+            "target_category": self.target_var.get().strip(),
+        }
+        try:
+            self.window.grab_release()
+        except Exception:
+            pass
+        self.window.destroy()
+
+    def cancel(self):
+        self.result = None
+        try:
+            self.window.grab_release()
+        except Exception:
+            pass
+        self.window.destroy()
+
+    def show(self):
+        self.window.wait_visibility()
+        self.window.grab_set()
+        self.window.wait_window(self.window)
+        return self.result
+
 
 class CategoryEditorWindow:
     def __init__(self, app):
@@ -1181,50 +1248,33 @@ class CategoryEditorWindow:
             messagebox.showerror("Category Editor", "Selected category has no commands to move.")
             return
 
-        # Step 1: choose command from source category
-        command_prompt = MultiFieldPrompt(
+        available_commands = sorted(commands.keys())
+        target_categories = [name for name in sorted(categories.keys()) if name != source_category]
+
+        if not target_categories:
+            messagebox.showerror("Category Editor", "No other categories exist yet.")
+            return
+
+        dialog = MoveCommandDialog(
             self.window,
-            "Move Command",
-            ["command_name", "target_category"],
-            heading=f"Move a command from '{source_category}'",
+            source_category,
+            available_commands,
+            target_categories,
         )
-        values = command_prompt.show()
+        values = dialog.show()
         if values is None:
             return
 
-        command_name = values.get("command_name", "").strip()
-        target_category = values.get("target_category", "").strip()
+        command_name = values.get("command_name", "")
+        target_category = values.get("target_category", "")
 
-        if not command_name:
-            messagebox.showerror("Category Editor", "Command name is required.")
+        if not command_name or command_name not in commands:
+            messagebox.showerror("Category Editor", "Invalid command selection.")
             return
 
-        if command_name not in commands:
-            available = ", ".join(sorted(commands.keys()))
-            messagebox.showerror(
-                "Category Editor",
-                f"Command not found in {source_category}: {command_name}\n\nAvailable: {available}"
-            )
+        if not target_category or target_category not in categories:
+            messagebox.showerror("Category Editor", "Invalid target category selection.")
             return
-
-        if not target_category:
-            messagebox.showerror("Category Editor", "Target category is required.")
-            return
-
-        if target_category == source_category:
-            messagebox.showerror("Category Editor", "Source and target categories are the same.")
-            return
-
-        if target_category not in categories:
-            if not messagebox.askokcancel(
-                "Create Category",
-                f"Target category '{target_category}' does not exist.\n\nCreate it?"
-            ):
-                return
-            categories[target_category] = {}
-
-        if not isinstance(categories[target_category], dict):
-            categories[target_category] = {}
 
         if command_name in categories[target_category]:
             if not messagebox.askokcancel(
