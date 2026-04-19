@@ -845,9 +845,20 @@ class CommandEditorWindow:
         Entry(form, textvariable=self.name_var, width=42).grid(row=1, column=1, sticky="ew", pady=3)
 
         Label(form, text="Type:", width=14, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
-        self.type_var = StringVar(value="2")
-        self.type_entry = Entry(form, textvariable=self.type_var, width=42)
-        self.type_entry.grid(row=2, column=1, sticky="ew", pady=3)
+
+        self.type_choices = {
+            "Select Window": "0",
+            "Spawn Terminal": "1",
+            "Send To Window": "2",
+            "Detached Command": "3",
+            "Chain": "chain",
+            "Plugin": "plugin",
+        }
+
+        self.type_var = StringVar(value="Send To Window")
+        self.type_menu = OptionMenu(form, self.type_var, *self.type_choices.keys())
+        self.type_menu.config(width=38)
+        self.type_menu.grid(row=2, column=1, sticky="w", pady=3)
 
         self.command_label = Label(form, text="Command:", width=14, anchor="nw")
         self.command_label.grid(row=3, column=0, sticky="nw", pady=3)
@@ -892,11 +903,20 @@ class CommandEditorWindow:
         self.clear_form()
 
     def update_type_ui(self, *_args):
-        cmd_type_raw = self.type_var.get().strip().lower()
+        cmd_type_raw = self.type_choices.get(self.type_var.get(), "2").strip().lower()
+
         if cmd_type_raw == "chain":
             self.command_label.config(text="Chain JSON:")
             self.builder_button.config(state="normal")
             self.chain_hint.config(text="Build visually or edit JSON directly")
+        elif cmd_type_raw == "plugin":
+            self.command_label.config(text="Plugin Name:")
+            self.builder_button.config(state="disabled")
+            self.chain_hint.config(text="Enter the plugin name, e.g. hello_world")
+        elif cmd_type_raw == "0":
+            self.command_label.config(text="Command:")
+            self.builder_button.config(state="disabled")
+            self.chain_hint.config(text="Usually not needed; select window action")
         else:
             self.command_label.config(text="Command:")
             self.builder_button.config(state="disabled")
@@ -937,7 +957,8 @@ class CommandEditorWindow:
         self.category_var.set(category)
         self.name_var.set(name)
         cmd_type, cmd, options = self.app.parse_command_entry_public(entry)
-        self.type_var.set(str(cmd_type))
+        reverse_type_choices = {v: k for k, v in self.type_choices.items()}
+        self.type_var.set(reverse_type_choices.get(str(cmd_type), "Send To Window")) 
         self.command_text.delete("1.0", END)
         if isinstance(cmd, str):
             self.command_text.insert("1.0", cmd)
@@ -950,7 +971,7 @@ class CommandEditorWindow:
     def clear_form(self):
         self.category_var.set("")
         self.name_var.set("")
-        self.type_var.set("2")
+        self.type_var.set("Send To Window")
         self.command_text.delete("1.0", END)
         self.options_text.delete("1.0", END)
         self.options_text.insert("1.0", "{}")
@@ -959,7 +980,7 @@ class CommandEditorWindow:
     def _parse_form(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
-        cmd_type_raw = self.type_var.get().strip()
+        cmd_type_raw = self.type_choices.get(self.type_var.get(), "2").strip()
         command_raw = self.command_text.get("1.0", END).strip()
         options_raw = self.options_text.get("1.0", END).strip() or "{}"
 
@@ -999,26 +1020,40 @@ class CommandEditorWindow:
             categories[category] = {}
 
         categories[category][name] = entry
+
         self.app.persist_categories()
-        self.app.reload_from_config_with_notice(silent=True)
+        self.app.rebuild_category_buttons()
         self.app.set_status(f"Saved command {category}/{name}")
-        self.refresh()
+
+        try:
+            if self.window.winfo_exists() and self.listbox.winfo_exists():
+                self.refresh()
+        except Exception:
+            pass
 
     def delete_entry(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
         categories = getattr(self.app.cfg, "Categories", {})
+
         if category not in categories or name not in categories[category]:
             messagebox.showerror("Command Editor", "Selected command was not found.")
             return
+
         del categories[category][name]
         if not categories[category]:
             del categories[category]
+
         self.app.persist_categories()
-        self.app.reload_from_config_with_notice(silent=True)
+        self.app.rebuild_category_buttons()
         self.app.set_status(f"Deleted command {category}/{name}")
         self.clear_form()
-        self.refresh()
+
+        try:
+            if self.window.winfo_exists() and self.listbox.winfo_exists():
+                self.refresh()
+        except Exception:
+            pass
 
 class MoveCommandDialog:
     def __init__(self, parent, source_category: str, commands: list[str], categories: list[str]):
@@ -1431,21 +1466,35 @@ class TermForgeApp:
         return windows
 
     def persist_windows(self) -> None:
-        windows = self.get_windows_dict()
+        self.persist_full_config()
+
+    def persist_full_config(self) -> None:
         try:
-            text = CONFIG_FILE.read_text(encoding="utf-8")
-            rendered = pprint.pformat(windows, indent=4)
-            if re.search(r"(?m)^Windows\s*=", text):
-                text = re.sub(
-                    r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)",
-                    f"Windows = {rendered}\n",
-                    text,
-                )
-            else:
-                text += f"\n\nWindows = {rendered}\n"
-            CONFIG_FILE.write_text(text, encoding="utf-8")
+            terminal = getattr(self.cfg, "terminal", {"application": "gnome-terminal"})
+            debug = getattr(self.cfg, "debug", {"Flag": False})
+            windows = getattr(self.cfg, "Windows", {})
+            favorites = getattr(self.cfg, "Favorites", [])
+            hotkeys = getattr(self.cfg, "Hotkeys", {})
+            disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
+            categories = getattr(self.cfg, "Categories", {})
+
+            lines = [
+                "# TermForge user configuration",
+                "# Edit Categories below.",
+                "",
+                f"terminal = {pprint.pformat(terminal, indent=4)}",
+                f"debug = {pprint.pformat(debug, indent=4)}",
+                f"Windows = {pprint.pformat(windows, indent=4)}",
+                f"Favorites = {pprint.pformat(favorites, indent=4)}",
+                f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
+                f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
+                f"Categories = {pprint.pformat(categories, indent=4)}",
+                "",
+            ]
+
+            CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
         except Exception as exc:
-            self.log(f"Could not persist window profiles: {exc}")
+            self.log(f"Could not persist full config: {exc}")
 
     def rebuild_category_buttons(self) -> None:
         if not hasattr(self, "categories_frame"):
@@ -1476,44 +1525,11 @@ class TermForgeApp:
             setattr(self.cfg, "Hotkeys", hotkeys)
         return hotkeys
 
-
-    def persist_hotkeys(self) -> None:
-        hotkeys = self.get_hotkeys_dict()
-        try:
-            text = CONFIG_FILE.read_text(encoding="utf-8")
-            rendered = pprint.pformat(hotkeys, indent=4)
-            if re.search(r"(?m)^Hotkeys\s*=", text):
-                text = re.sub(
-                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
-                    f"Hotkeys = {rendered}\n",
-                    text,
-                )
-            else:
-                text += f"\n\nHotkeys = {rendered}\n"
-            CONFIG_FILE.write_text(text, encoding="utf-8")
-        except Exception as exc:
-            self.log(f"Could not persist hotkeys: {exc}")
-
     def open_hotkey_editor(self) -> None:
         HotkeyEditorWindow(self)
 
-
     def persist_hotkeys(self) -> None:
-        hotkeys = self.get_hotkeys_dict()
-        try:
-            text = CONFIG_FILE.read_text(encoding="utf-8")
-            rendered = pprint.pformat(hotkeys, indent=4)
-            if re.search(r"(?m)^Hotkeys\s*=", text):
-                text = re.sub(
-                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
-                    f"Hotkeys = {rendered}\n",
-                    text,
-                )
-            else:
-                text += f"\n\nHotkeys = {rendered}\n"
-            CONFIG_FILE.write_text(text, encoding="utf-8")
-        except Exception as exc:
-            self.log(f"Could not persist hotkeys: {exc}")
+        self.persist_full_config()
 
     def get_disabled_plugins(self) -> list[str]:
         disabled = getattr(self.cfg, "DisabledPlugins", None)
@@ -2279,27 +2295,11 @@ class TermForgeApp:
         listbox.bind("<<ListboxSelect>>", show_selected)
         refresh()
 
-
-
     def parse_command_entry_public(self, entry):
         return parse_command_entry(entry)
 
     def persist_categories(self) -> None:
-        categories = getattr(self.cfg, "Categories", {})
-        try:
-            text = CONFIG_FILE.read_text(encoding="utf-8")
-            rendered = pprint.pformat(categories, indent=4)
-            if re.search(r"(?m)^Categories\s*=", text):
-                text = re.sub(
-                    r"(?ms)^Categories\s*=\s*{.*?}(?=^\S|\Z)",
-                    f"Categories = {rendered}\n",
-                    text,
-                )
-            else:
-                text += f"\n\nCategories = {rendered}\n"
-            CONFIG_FILE.write_text(text, encoding="utf-8")
-        except Exception as exc:
-            self.log(f"Could not persist categories: {exc}")
+        self.persist_full_config()
 
     def reload_from_config_with_notice(self, silent: bool = False) -> None:
         try:
