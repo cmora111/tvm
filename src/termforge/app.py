@@ -837,8 +837,13 @@ class CommandEditorWindow:
         form.pack(fill=X)
 
         Label(form, text="Category:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
+
+        self.category_choices = []
         self.category_var = StringVar()
-        Entry(form, textvariable=self.category_var, width=42).grid(row=0, column=1, sticky="ew", pady=3)
+
+        self.category_menu = OptionMenu(form, self.category_var, "")
+        self.category_menu.config(width=38)
+        self.category_menu.grid(row=0, column=1, sticky="w", pady=3)
 
         Label(form, text="Command Name:", width=14, anchor="w").grid(row=1, column=0, sticky="w", pady=3)
         self.name_var = StringVar()
@@ -899,6 +904,7 @@ class CommandEditorWindow:
         self.snapshot = []
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.type_var.trace_add("write", self.update_type_ui)
+        self.refresh_category_menu()
         self.refresh()
         self.clear_form()
 
@@ -949,6 +955,26 @@ class CommandEditorWindow:
                 self.snapshot.append((category, name, entry))
                 self.listbox.insert(END, f"{category} -> {name}")
 
+    def refresh_category_menu(self):
+        categories = getattr(self.app.cfg, "Categories", {})
+        self.category_choices = sorted(categories.keys())
+
+        menu = self.category_menu["menu"]
+        menu.delete(0, "end")
+
+        for name in self.category_choices:
+            menu.add_command(
+                label=name,
+                command=lambda value=name: self.category_var.set(value)
+            )
+
+        current = self.category_var.get().strip()
+        if self.category_choices:
+            if current not in self.category_choices:
+                self.category_var.set(self.category_choices[0])
+        else:
+            self.category_var.set("")
+
     def on_select(self, _event=None):
         idxs = self.listbox.curselection()
         if not idxs:
@@ -969,7 +995,10 @@ class CommandEditorWindow:
         self.update_type_ui()
 
     def clear_form(self):
-        self.category_var.set("")
+        if self.category_choices:
+            self.category_var.set(self.category_choices[0])
+        else:
+            self.category_var.set("")
         self.name_var.set("")
         self.type_var.set("Send To Window")
         self.command_text.delete("1.0", END)
