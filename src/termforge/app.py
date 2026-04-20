@@ -36,7 +36,6 @@ from tkinter import (
     Tk,
     Toplevel,
     messagebox,
-    OptionMenu,
 )
 
 APP_NAME = "TermForge"
@@ -837,33 +836,17 @@ class CommandEditorWindow:
         form.pack(fill=X)
 
         Label(form, text="Category:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
-
-        self.category_choices = []
         self.category_var = StringVar()
-
-        self.category_menu = OptionMenu(form, self.category_var, "")
-        self.category_menu.config(width=38)
-        self.category_menu.grid(row=0, column=1, sticky="w", pady=3)
+        Entry(form, textvariable=self.category_var, width=42).grid(row=0, column=1, sticky="ew", pady=3)
 
         Label(form, text="Command Name:", width=14, anchor="w").grid(row=1, column=0, sticky="w", pady=3)
         self.name_var = StringVar()
         Entry(form, textvariable=self.name_var, width=42).grid(row=1, column=1, sticky="ew", pady=3)
 
         Label(form, text="Type:", width=14, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
-
-        self.type_choices = {
-            "Select Window": "0",
-            "Spawn Terminal": "1",
-            "Send To Window": "2",
-            "Detached Command": "3",
-            "Chain": "chain",
-            "Plugin": "plugin",
-        }
-
-        self.type_var = StringVar(value="Send To Window")
-        self.type_menu = OptionMenu(form, self.type_var, *self.type_choices.keys())
-        self.type_menu.config(width=38)
-        self.type_menu.grid(row=2, column=1, sticky="w", pady=3)
+        self.type_var = StringVar(value="2")
+        self.type_entry = Entry(form, textvariable=self.type_var, width=42)
+        self.type_entry.grid(row=2, column=1, sticky="ew", pady=3)
 
         self.command_label = Label(form, text="Command:", width=14, anchor="nw")
         self.command_label.grid(row=3, column=0, sticky="nw", pady=3)
@@ -904,25 +887,15 @@ class CommandEditorWindow:
         self.snapshot = []
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.type_var.trace_add("write", self.update_type_ui)
-        self.refresh_category_menu()
         self.refresh()
         self.clear_form()
 
     def update_type_ui(self, *_args):
-        cmd_type_raw = self.type_choices.get(self.type_var.get(), "2").strip().lower()
-
+        cmd_type_raw = self.type_var.get().strip().lower()
         if cmd_type_raw == "chain":
             self.command_label.config(text="Chain JSON:")
             self.builder_button.config(state="normal")
             self.chain_hint.config(text="Build visually or edit JSON directly")
-        elif cmd_type_raw == "plugin":
-            self.command_label.config(text="Plugin Name:")
-            self.builder_button.config(state="disabled")
-            self.chain_hint.config(text="Enter the plugin name, e.g. hello_world")
-        elif cmd_type_raw == "0":
-            self.command_label.config(text="Command:")
-            self.builder_button.config(state="disabled")
-            self.chain_hint.config(text="Usually not needed; select window action")
         else:
             self.command_label.config(text="Command:")
             self.builder_button.config(state="disabled")
@@ -955,26 +928,6 @@ class CommandEditorWindow:
                 self.snapshot.append((category, name, entry))
                 self.listbox.insert(END, f"{category} -> {name}")
 
-    def refresh_category_menu(self):
-        categories = getattr(self.app.cfg, "Categories", {})
-        self.category_choices = sorted(categories.keys())
-
-        menu = self.category_menu["menu"]
-        menu.delete(0, "end")
-
-        for name in self.category_choices:
-            menu.add_command(
-                label=name,
-                command=lambda value=name: self.category_var.set(value)
-            )
-
-        current = self.category_var.get().strip()
-        if self.category_choices:
-            if current not in self.category_choices:
-                self.category_var.set(self.category_choices[0])
-        else:
-            self.category_var.set("")
-
     def on_select(self, _event=None):
         idxs = self.listbox.curselection()
         if not idxs:
@@ -983,8 +936,7 @@ class CommandEditorWindow:
         self.category_var.set(category)
         self.name_var.set(name)
         cmd_type, cmd, options = self.app.parse_command_entry_public(entry)
-        reverse_type_choices = {v: k for k, v in self.type_choices.items()}
-        self.type_var.set(reverse_type_choices.get(str(cmd_type), "Send To Window")) 
+        self.type_var.set(str(cmd_type))
         self.command_text.delete("1.0", END)
         if isinstance(cmd, str):
             self.command_text.insert("1.0", cmd)
@@ -995,12 +947,9 @@ class CommandEditorWindow:
         self.update_type_ui()
 
     def clear_form(self):
-        if self.category_choices:
-            self.category_var.set(self.category_choices[0])
-        else:
-            self.category_var.set("")
+        self.category_var.set("")
         self.name_var.set("")
-        self.type_var.set("Send To Window")
+        self.type_var.set("2")
         self.command_text.delete("1.0", END)
         self.options_text.delete("1.0", END)
         self.options_text.insert("1.0", "{}")
@@ -1009,7 +958,7 @@ class CommandEditorWindow:
     def _parse_form(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
-        cmd_type_raw = self.type_choices.get(self.type_var.get(), "2").strip()
+        cmd_type_raw = self.type_var.get().strip()
         command_raw = self.command_text.get("1.0", END).strip()
         options_raw = self.options_text.get("1.0", END).strip() or "{}"
 
@@ -1049,106 +998,26 @@ class CommandEditorWindow:
             categories[category] = {}
 
         categories[category][name] = entry
-
         self.app.persist_categories()
-        self.app.rebuild_category_buttons()
+        self.app.reload_from_config_with_notice(silent=True)
         self.app.set_status(f"Saved command {category}/{name}")
-
-        try:
-            if self.window.winfo_exists() and self.listbox.winfo_exists():
-                self.refresh()
-        except Exception:
-            pass
+        self.refresh()
 
     def delete_entry(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
         categories = getattr(self.app.cfg, "Categories", {})
-
         if category not in categories or name not in categories[category]:
             messagebox.showerror("Command Editor", "Selected command was not found.")
             return
-
         del categories[category][name]
         if not categories[category]:
             del categories[category]
-
         self.app.persist_categories()
-        self.app.rebuild_category_buttons()
+        self.app.reload_from_config_with_notice(silent=True)
         self.app.set_status(f"Deleted command {category}/{name}")
         self.clear_form()
-
-        try:
-            if self.window.winfo_exists() and self.listbox.winfo_exists():
-                self.refresh()
-        except Exception:
-            pass
-
-class MoveCommandDialog:
-    def __init__(self, parent, source_category: str, commands: list[str], categories: list[str]):
-        self.result = None
-        self.window = Toplevel(parent)
-        self.window.title("Move Command")
-        self.window.transient(parent)
-        self.window.grab_set()
-        self.window.resizable(False, False)
-        self.window.protocol("WM_DELETE_WINDOW", self.cancel)
-
-        outer = Frame(self.window, padx=10, pady=10)
-        outer.pack(fill=BOTH, expand=True)
-
-        Label(
-            outer,
-            text=f"Move command from '{source_category}'",
-            bd=2,
-            relief="groove",
-            width=34,
-            bg="lightgreen",
-            fg="black",
-        ).pack(pady=(0, 10))
-
-        row1 = Frame(outer)
-        row1.pack(fill=X, pady=3)
-        Label(row1, text="Command:", width=14, anchor="w").pack(side=LEFT)
-        self.command_var = StringVar(value=commands[0] if commands else "")
-        OptionMenu(row1, self.command_var, *(commands if commands else [""])).pack(side=RIGHT, fill=X, expand=True)
-
-        row2 = Frame(outer)
-        row2.pack(fill=X, pady=3)
-        Label(row2, text="Target Category:", width=14, anchor="w").pack(side=LEFT)
-        target_choices = categories if categories else [""]
-        self.target_var = StringVar(value=target_choices[0])
-        OptionMenu(row2, self.target_var, *target_choices).pack(side=RIGHT, fill=X, expand=True)
-
-        buttons = Frame(outer)
-        buttons.pack(fill=X, pady=(12, 0))
-        Button(buttons, text="OK", width=12, bg="darkgreen", fg="white", command=self.submit).pack(side=LEFT)
-        Button(buttons, text="Cancel", width=12, bg="red", fg="black", command=self.cancel).pack(side=RIGHT)
-
-    def submit(self):
-        self.result = {
-            "command_name": self.command_var.get().strip(),
-            "target_category": self.target_var.get().strip(),
-        }
-        try:
-            self.window.grab_release()
-        except Exception:
-            pass
-        self.window.destroy()
-
-    def cancel(self):
-        self.result = None
-        try:
-            self.window.grab_release()
-        except Exception:
-            pass
-        self.window.destroy()
-
-    def show(self):
-        self.window.wait_visibility()
-        self.window.grab_set()
-        self.window.wait_window(self.window)
-        return self.result
+        self.refresh()
 
 
 class CategoryEditorWindow:
@@ -1177,7 +1046,6 @@ class CategoryEditorWindow:
         Button(action_row, text="Create Category", width=16, bg="darkgreen", fg="white", command=self.create_category).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Rename Category", width=16, bg="#2f5597", fg="white", command=self.rename_category).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Delete Category", width=16, bg="#7f6000", fg="white", command=self.delete_category).pack(side=LEFT, padx=(0, 6))
-        Button(action_row, text="Move Command", width=16, bg="#444444", fg="white", command=self.move_command).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Refresh", width=16, bg="navy", fg="white", command=self.refresh).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(side=RIGHT)
 
@@ -1300,62 +1168,6 @@ class CategoryEditorWindow:
         self.app.set_status(f"Renamed category {old_name} -> {new_name}")
         self.refresh()
 
-    def move_command(self):
-        source_category = self.selected_category_name()
-        if not source_category:
-            messagebox.showerror("Category Editor", "Select a source category first.")
-            return
-
-        categories = self.get_categories()
-        commands = categories.get(source_category, {})
-        if not isinstance(commands, dict) or not commands:
-            messagebox.showerror("Category Editor", "Selected category has no commands to move.")
-            return
-
-        available_commands = sorted(commands.keys())
-        target_categories = [name for name in sorted(categories.keys()) if name != source_category]
-
-        if not target_categories:
-            messagebox.showerror("Category Editor", "No other categories exist yet.")
-            return
-
-        dialog = MoveCommandDialog(
-            self.window,
-            source_category,
-            available_commands,
-            target_categories,
-        )
-        values = dialog.show()
-        if values is None:
-            return
-
-        command_name = values.get("command_name", "")
-        target_category = values.get("target_category", "")
-
-        if not command_name or command_name not in commands:
-            messagebox.showerror("Category Editor", "Invalid command selection.")
-            return
-
-        if not target_category or target_category not in categories:
-            messagebox.showerror("Category Editor", "Invalid target category selection.")
-            return
-
-        if command_name in categories[target_category]:
-            if not messagebox.askokcancel(
-                "Overwrite Command",
-                f"'{command_name}' already exists in '{target_category}'.\n\nOverwrite it?"
-            ):
-                return
-
-        categories[target_category][command_name] = commands.pop(command_name)
-
-        self.app.persist_categories()
-        self.app.rebuild_category_buttons()
-        self.app.set_status(
-            f"Moved command {command_name} from {source_category} to {target_category}"
-        )
-        self.refresh()
-
     def delete_category(self):
         name = self.selected_category_name()
         if not name:
@@ -1376,6 +1188,155 @@ class CategoryEditorWindow:
         self.app.rebuild_category_buttons()
         self.app.set_status(f"Deleted category {name}")
         self.refresh()
+
+
+class CommandPaletteWindow:
+    def __init__(self, app):
+        self.app = app
+        self.window = Toplevel(app.root)
+        self.window.title("Command Palette")
+        self.window.geometry("860x520")
+        self.window.transient(app.root)
+        self.window.resizable(True, True)
+
+        outer = Frame(self.window, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text="Command Palette",
+            bd=4,
+            width=28,
+            bg="lightgreen",
+            fg="black",
+            relief="raised",
+        ).pack(pady=(0, 8))
+
+        search_row = Frame(outer)
+        search_row.pack(fill=X, pady=(0, 8))
+        Label(search_row, text="Search:", width=10, anchor="w").pack(side=LEFT)
+
+        self.query_var = StringVar()
+        self.search_entry = Entry(search_row, textvariable=self.query_var, width=48)
+        self.search_entry.pack(side=LEFT, fill=X, expand=True)
+
+        Button(search_row, text="Run", width=10, bg="darkgreen", fg="white", command=self.run_selected).pack(side=LEFT, padx=(6, 0))
+        Button(search_row, text="Close", width=10, bg="red", fg="black", command=self.window.destroy).pack(side=LEFT, padx=(6, 0))
+
+        body = Frame(outer)
+        body.pack(fill=BOTH, expand=True)
+
+        left = Frame(body)
+        left.pack(side=LEFT, fill=BOTH, expand=True)
+
+        self.listbox = Listbox(left, width=48, height=18)
+        self.listbox.pack(side=LEFT, fill=BOTH, expand=True)
+        scrollbar = Scrollbar(left, command=self.listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        self.listbox.config(yscrollcommand=scrollbar.set)
+
+        self.info = Text(body, wrap="word", width=52, height=18)
+        self.info.pack(side=RIGHT, fill=BOTH, expand=True, padx=(10, 0))
+
+        self.snapshot = []
+        self.filtered = []
+
+        self.query_var.trace_add("write", self.refresh)
+        self.search_entry.bind("<Return>", lambda _e: self.run_selected())
+        self.search_entry.bind("<Down>", self.focus_listbox)
+        self.listbox.bind("<<ListboxSelect>>", self.show_selected)
+        self.listbox.bind("<Double-Button-1>", lambda _e: self.run_selected())
+        self.listbox.bind("<Return>", lambda _e: self.run_selected())
+        self.window.bind("<Escape>", lambda _e: self.window.destroy())
+
+        self.refresh()
+        self.search_entry.focus_set()
+
+    def collect_commands(self):
+        items = []
+        categories = getattr(self.app.cfg, "Categories", {})
+        for category in sorted(categories.keys()):
+            commands = categories.get(category, {})
+            if not isinstance(commands, dict):
+                continue
+            for name in sorted(commands.keys()):
+                entry = commands[name]
+                try:
+                    cmd_type, cmd, options = self.app.parse_command_entry_public(entry)
+                except Exception:
+                    cmd_type, cmd, options = "?", repr(entry), {}
+                preview = cmd if isinstance(cmd, str) else str(cmd)
+                items.append({
+                    "category": category,
+                    "name": name,
+                    "entry": entry,
+                    "type": cmd_type,
+                    "preview": preview,
+                    "options": options,
+                    "search_blob": f"{category} {name} {preview}".lower(),
+                })
+        return items
+
+    def refresh(self, *_args):
+        query = self.query_var.get().strip().lower()
+        self.snapshot = self.collect_commands()
+        if query:
+            self.filtered = [item for item in self.snapshot if query in item["search_blob"]]
+        else:
+            self.filtered = list(self.snapshot)
+
+        self.listbox.delete(0, END)
+        for item in self.filtered:
+            self.listbox.insert(END, f'{item["category"]} -> {item["name"]}')
+
+        self.info.delete("1.0", END)
+        if not self.filtered:
+            self.info.insert("1.0", "No matching commands found.\n")
+            return
+
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(0)
+        self.show_selected()
+
+    def focus_listbox(self, _event=None):
+        if self.listbox.size() > 0:
+            self.listbox.focus_set()
+            if not self.listbox.curselection():
+                self.listbox.selection_set(0)
+                self.show_selected()
+        return "break"
+
+    def selected_item(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return None
+        idx = idxs[0]
+        if idx >= len(self.filtered):
+            return None
+        return self.filtered[idx]
+
+    def show_selected(self, _event=None):
+        item = self.selected_item()
+        self.info.delete("1.0", END)
+        if not item:
+            return
+        lines = [
+            f'Category: {item["category"]}',
+            f'Command: {item["name"]}',
+            f'Type: {item["type"]}',
+            "",
+            "Preview:",
+            item["preview"],
+        ]
+        self.info.insert("1.0", "\n".join(lines))
+
+    def run_selected(self):
+        item = self.selected_item()
+        if not item:
+            return
+        self.window.destroy()
+        self.app.set_status(f'Palette run: {item["category"]}/{item["name"]}')
+        self.app.select_cmd(None, item["category"], item["name"])
 
 class TermForgeApp:
     def __init__(self, root: Tk, cfg) -> None:
@@ -1406,6 +1367,7 @@ class TermForgeApp:
         self.log("Starting TermForge")
         self.load_plugins(force=True)
         self.build_main()
+        self.bind_global_shortcuts()
         self.initialize_hotkeys()
         self.root.after(250, self.safe_initial_select)
 
@@ -1458,6 +1420,12 @@ class TermForgeApp:
         finally:
             self.root.destroy()
 
+    def open_command_palette(self, event=None) -> None:
+        CommandPaletteWindow(self)
+
+    def bind_global_shortcuts(self) -> None:
+        self.root.bind("<Control-p>", self.open_command_palette)
+
     def add_history_entry(self, action_type, command_text, source="manual") -> None:
         entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -1495,57 +1463,22 @@ class TermForgeApp:
         return windows
 
     def persist_windows(self) -> None:
-        self.persist_full_config()
-
-    def persist_full_config(self) -> None:
+        windows = self.get_windows_dict()
         try:
-            terminal = getattr(self.cfg, "terminal", {"application": "gnome-terminal"})
-            debug = getattr(self.cfg, "debug", {"Flag": False})
-            windows = getattr(self.cfg, "Windows", {})
-            favorites = getattr(self.cfg, "Favorites", [])
-            hotkeys = getattr(self.cfg, "Hotkeys", {})
-            disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
-            categories = getattr(self.cfg, "Categories", {})
-
-            lines = [
-                "# TermForge user configuration",
-                "# Edit Categories below.",
-                "",
-                f"terminal = {pprint.pformat(terminal, indent=4)}",
-                f"debug = {pprint.pformat(debug, indent=4)}",
-                f"Windows = {pprint.pformat(windows, indent=4)}",
-                f"Favorites = {pprint.pformat(favorites, indent=4)}",
-                f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
-                f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
-                f"Categories = {pprint.pformat(categories, indent=4)}",
-                "",
-            ]
-
-            CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(windows, indent=4)
+            if re.search(r"(?m)^Windows\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Windows\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Windows = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nWindows = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
         except Exception as exc:
-            self.log(f"Could not persist full config: {exc}")
+            self.log(f"Could not persist window profiles: {exc}")
 
-    def rebuild_category_buttons(self) -> None:
-        if not hasattr(self, "categories_frame"):
-            return
-
-        for child in self.categories_frame.winfo_children():
-            child.destroy()
-
-        self.category_buttons = {}
-        categories = getattr(self.cfg, "Categories", {})
-
-        for category in categories:
-            btn = Button(
-                self.categories_frame,
-                text=category,
-                width=28,
-                bg="black",
-                fg="yellow",
-                command=lambda c=category: self.open_category(c),
-            )
-            btn.pack(pady=2)
-            self.category_buttons[category] = btn
 
     def get_hotkeys_dict(self) -> dict:
         hotkeys = getattr(self.cfg, "Hotkeys", None)
@@ -1554,11 +1487,44 @@ class TermForgeApp:
             setattr(self.cfg, "Hotkeys", hotkeys)
         return hotkeys
 
+
+    def persist_hotkeys(self) -> None:
+        hotkeys = self.get_hotkeys_dict()
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(hotkeys, indent=4)
+            if re.search(r"(?m)^Hotkeys\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Hotkeys = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nHotkeys = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist hotkeys: {exc}")
+
     def open_hotkey_editor(self) -> None:
         HotkeyEditorWindow(self)
 
+
     def persist_hotkeys(self) -> None:
-        self.persist_full_config()
+        hotkeys = self.get_hotkeys_dict()
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(hotkeys, indent=4)
+            if re.search(r"(?m)^Hotkeys\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Hotkeys\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Hotkeys = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nHotkeys = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist hotkeys: {exc}")
 
     def get_disabled_plugins(self) -> list[str]:
         disabled = getattr(self.cfg, "DisabledPlugins", None)
@@ -2295,8 +2261,6 @@ class TermForgeApp:
                 "Command:",
                 entry.get("command", ""),
             ]
-            lines.append("")
-            lines.append("Use 'Move Command' to move one of these into another category.")
             info.delete("1.0", END)
             info.insert("1.0", "\n".join(lines))
 
@@ -2324,11 +2288,27 @@ class TermForgeApp:
         listbox.bind("<<ListboxSelect>>", show_selected)
         refresh()
 
+
+
     def parse_command_entry_public(self, entry):
         return parse_command_entry(entry)
 
     def persist_categories(self) -> None:
-        self.persist_full_config()
+        categories = getattr(self.cfg, "Categories", {})
+        try:
+            text = CONFIG_FILE.read_text(encoding="utf-8")
+            rendered = pprint.pformat(categories, indent=4)
+            if re.search(r"(?m)^Categories\s*=", text):
+                text = re.sub(
+                    r"(?ms)^Categories\s*=\s*{.*?}(?=^\S|\Z)",
+                    f"Categories = {rendered}\n",
+                    text,
+                )
+            else:
+                text += f"\n\nCategories = {rendered}\n"
+            CONFIG_FILE.write_text(text, encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist categories: {exc}")
 
     def reload_from_config_with_notice(self, silent: bool = False) -> None:
         try:
@@ -2354,6 +2334,13 @@ class TermForgeApp:
     def open_category_editor(self) -> None:
         CategoryEditorWindow(self)
 
+
+#    def open_command_palette(self, event=None) -> None:
+#        CommandPaletteWindow(self)
+
+#    def bind_global_shortcuts(self) -> None:
+#        self.root.bind_all("<Control-p>", self.open_command_palette)
+
     def build_menu(self) -> None:
         menubar = Menu(self.root)
 
@@ -2362,6 +2349,8 @@ class TermForgeApp:
         menubar.add_cascade(label="File", menu=file_menu)
 
         tools_menu = Menu(menubar, tearoff=0)
+        tools_menu.add_command(label="Command Palette\tCtrl+P", command=self.open_command_palette)
+        tools_menu.add_separator()
         tools_menu.add_command(label="Select Target Window", command=self.select_target_window_with_notice)
         tools_menu.add_command(label="Reuse Saved Window", command=self.reuse_last_window)
         tools_menu.add_command(label="Forget Saved Window", command=self.forget_saved_window)
@@ -2381,6 +2370,7 @@ class TermForgeApp:
 
         help_menu = Menu(menubar, tearoff=0)
         help_menu.add_command(label="About TermForge", command=self.show_about)
+        help_menu.add_command(label="Command Palette", command=self.open_command_palette)
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.root.config(menu=menubar)
@@ -2434,13 +2424,13 @@ class TermForgeApp:
         self.search_var.trace_add("write", self.update_category_filter)
         search_entry.bind("<Return>", self.open_search_results)
 
-        self.categories_frame = Frame(frame)
-        self.categories_frame.pack()
+        categories_frame = Frame(frame)
+        categories_frame.pack()
         self.category_buttons = {}
         categories = getattr(self.cfg, "Categories", {})
         for category in categories:
             btn = Button(
-                self.categories_frame,
+                categories_frame,
                 text=category,
                 width=28,
                 bg="black",
