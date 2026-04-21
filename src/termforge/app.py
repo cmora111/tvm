@@ -88,6 +88,7 @@ def ensure_user_config() -> None:
         f"debug = {repr(getattr(default_config, 'debug', {'Flag': False}))}",
         "Windows = {}",
         f"Favorites = {repr(getattr(default_config, 'Favorites', [])) if hasattr(default_config, 'Favorites') else '[]'}",
+        "Recent = []",
         "Hotkeys = {}",
         "DisabledPlugins = []",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
@@ -1255,17 +1256,27 @@ class CommandPaletteWindow:
     def collect_commands(self):
         items = []
         categories = getattr(self.app.cfg, "Categories", {})
+        favorites = set((c, s) for c, s in self.app.get_favorites())
+        recent_list = self.app.get_recent()
+        recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
+
         for category in sorted(categories.keys()):
             commands = categories.get(category, {})
             if not isinstance(commands, dict):
                 continue
+
             for name in sorted(commands.keys()):
                 entry = commands[name]
                 try:
                     cmd_type, cmd, options = self.app.parse_command_entry_public(entry)
                 except Exception:
                     cmd_type, cmd, options = "?", repr(entry), {}
+
                 preview = cmd if isinstance(cmd, str) else str(cmd)
+                is_favorite = (category, name) in favorites
+                is_recent = (category, name) in recent
+                recent_rank = recent.get((category, name), 999)
+
                 items.append({
                     "category": category,
                     "name": name,
@@ -1273,8 +1284,21 @@ class CommandPaletteWindow:
                     "type": cmd_type,
                     "preview": preview,
                     "options": options,
+                    "favorite": is_favorite,
+                    "recent": is_recent,
+                    "recent_rank": recent_rank,
                     "search_blob": f"{category} {name} {preview}".lower(),
                 })
+
+        items.sort(
+            key=lambda item: (
+                not item["favorite"],
+                not item["recent"],
+                item["recent_rank"],
+                item["category"].lower(),
+                item["name"].lower(),
+            )
+        )
         return items
 
     def refresh(self, *_args):
@@ -1287,7 +1311,13 @@ class CommandPaletteWindow:
 
         self.listbox.delete(0, END)
         for item in self.filtered:
-            self.listbox.insert(END, f'{item["category"]} -> {item["name"]}')
+            if item["favorite"]:
+                prefix = "★ "
+            elif item["recent"]:
+                prefix = "⟳ "
+            else:
+                prefix = "  "
+            self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}')
 
         self.info.delete("1.0", END)
         if not self.filtered:
@@ -1367,7 +1397,6 @@ class TermForgeApp:
         self.log("Starting TermForge")
         self.load_plugins(force=True)
         self.build_main()
-        self.bind_global_shortcuts()
         self.initialize_hotkeys()
         self.root.after(250, self.safe_initial_select)
 
@@ -1419,12 +1448,6 @@ class TermForgeApp:
             self.root.quit()
         finally:
             self.root.destroy()
-
-    def open_command_palette(self, event=None) -> None:
-        CommandPaletteWindow(self)
-
-    def bind_global_shortcuts(self) -> None:
-        self.root.bind("<Control-p>", self.open_command_palette)
 
     def add_history_entry(self, action_type, command_text, source="manual") -> None:
         entry = {
@@ -2114,6 +2137,7 @@ class TermForgeApp:
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
         entry = self.cfg.Categories[category][subcategory]
         cmd_type, cmd, options = parse_command_entry(entry)
+        self.add_recent(category, subcategory)
         self.run_cmd(cmd_type, cmd, options, parent_window)
 
     def run_favorite(self, category: str, subcategory: str) -> None:
@@ -2335,11 +2359,137 @@ class TermForgeApp:
         CategoryEditorWindow(self)
 
 
-#    def open_command_palette(self, event=None) -> None:
-#        CommandPaletteWindow(self)
+    def open_command_palette(self, event=None) -> None:
+        CommandPaletteWindow(self)
 
-#    def bind_global_shortcuts(self) -> None:
-#        self.root.bind_all("<Control-p>", self.open_command_palette)
+    def bind_global_shortcuts(self) -> None:
+        self.root.bind_all("<Control-p>", self.open_command_palette)
+
+
+    def persist_full_config(self) -> None:
+        try:
+            terminal = getattr(self.cfg, "terminal", {"application": "gnome-terminal"})
+            debug = getattr(self.cfg, "debug", {"Flag": False})
+            windows = getattr(self.cfg, "Windows", {})
+            favorites = getattr(self.cfg, "Favorites", [])
+            recent = getattr(self.cfg, "Recent", [])
+            hotkeys = getattr(self.cfg, "Hotkeys", {})
+            disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
+            categories = getattr(self.cfg, "Categories", {})
+
+            lines = [
+                "# TermForge user configuration",
+                "# Edit Categories below.",
+                "",
+                f"terminal = {pprint.pformat(terminal, indent=4)}",
+                f"debug = {pprint.pformat(debug, indent=4)}",
+                f"Windows = {pprint.pformat(windows, indent=4)}",
+                f"Favorites = {pprint.pformat(favorites, indent=4)}",
+                f"Recent = {pprint.pformat(recent, indent=4)}",
+                f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
+                f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
+                f"Categories = {pprint.pformat(categories, indent=4)}",
+                "",
+            ]
+
+            CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
+        except Exception as exc:
+            self.log(f"Could not persist full config: {exc}")
+
+    def persist_categories(self) -> None:
+        self.persist_full_config()
+
+    def persist_hotkeys(self) -> None:
+        self.persist_full_config()
+
+    def persist_windows(self) -> None:
+        self.persist_full_config()
+
+    def get_recent(self) -> list[tuple[str, str]]:
+        raw = getattr(self.cfg, "Recent", [])
+        if not isinstance(raw, list):
+            return []
+        return [(c, s) for c, s in raw if isinstance(c, str) and isinstance(s, str)]
+
+    def persist_recent(self) -> None:
+        self.persist_full_config()
+
+    def add_recent(self, category: str, command: str) -> None:
+        recent = getattr(self.cfg, "Recent", None)
+        if recent is None or not isinstance(recent, list):
+            recent = []
+            setattr(self.cfg, "Recent", recent)
+
+        pair = [category, command]
+        if pair in recent:
+            recent.remove(pair)
+        recent.insert(0, pair)
+        del recent[20:]
+        self.persist_recent()
+
+    def persist_favorites(self) -> None:
+        self.persist_full_config()
+
+    def add_favorite(self, category: str, command: str) -> None:
+        favorites = getattr(self.cfg, "Favorites", None)
+        if favorites is None or not isinstance(favorites, list):
+            favorites = []
+            setattr(self.cfg, "Favorites", favorites)
+        pair = [category, command]
+        if pair not in favorites:
+            favorites.append(pair)
+            self.persist_favorites()
+
+    def remove_favorite(self, category: str, command: str) -> None:
+        favorites = getattr(self.cfg, "Favorites", None)
+        if not isinstance(favorites, list):
+            return
+        pair = [category, command]
+        if pair in favorites:
+            favorites.remove(pair)
+            self.persist_favorites()
+
+    def run_favorite(self, category: str, subcategory: str) -> None:
+        self.select_cmd(None, category, subcategory)
+
+    def rebuild_favorites_bar(self) -> None:
+        if not hasattr(self, "favorites_frame"):
+            return
+
+        for child in self.favorites_frame.winfo_children():
+            child.destroy()
+
+        favorites = self.get_favorites()
+        for category, command in favorites:
+            Button(
+                self.favorites_frame,
+                text=command,
+                width=13,
+                bg="#1f4e79",
+                fg="white",
+                command=lambda c=category, s=command: self.run_favorite(c, s),
+            ).pack(side=LEFT, padx=2, pady=2)
+
+    def rebuild_category_buttons(self) -> None:
+        if not hasattr(self, "categories_frame"):
+            return
+
+        for child in self.categories_frame.winfo_children():
+            child.destroy()
+
+        self.category_buttons = {}
+        categories = getattr(self.cfg, "Categories", {})
+        for category in categories:
+            btn = Button(
+                self.categories_frame,
+                text=category,
+                width=28,
+                bg="black",
+                fg="yellow",
+                command=lambda c=category: self.open_category(c),
+            )
+            btn.pack(pady=2)
+            self.category_buttons[category] = btn
 
     def build_menu(self) -> None:
         menubar = Menu(self.root)
@@ -2402,17 +2552,12 @@ class TermForgeApp:
         favorites = self.get_favorites()
         if favorites:
             Label(frame, text="Favorites", width=28, bg="#d9edf7", fg="black", relief="groove").pack(pady=(0, 4))
-            favorites_frame = Frame(frame)
-            favorites_frame.pack(fill=X, pady=(0, 8))
-            for category, subcategory in favorites:
-                Button(
-                    favorites_frame,
-                    text=subcategory,
-                    width=13,
-                    bg="#1f4e79",
-                    fg="white",
-                    command=lambda c=category, s=subcategory: self.run_favorite(c, s),
-                ).pack(side=LEFT, padx=2, pady=2)
+            self.favorites_frame = Frame(frame)
+            self.favorites_frame.pack(fill=X, pady=(0, 8))
+            self.rebuild_favorites_bar()
+        else:
+            self.favorites_frame = Frame(frame)
+            self.favorites_frame.pack(fill=X, pady=(0, 8))
 
         search_row = Frame(frame)
         search_row.pack(fill=X, pady=(0, 8))
@@ -2424,13 +2569,14 @@ class TermForgeApp:
         self.search_var.trace_add("write", self.update_category_filter)
         search_entry.bind("<Return>", self.open_search_results)
 
-        categories_frame = Frame(frame)
-        categories_frame.pack()
+        self.categories_frame = Frame(frame)
+        self.categories_frame.pack()
         self.category_buttons = {}
+
         categories = getattr(self.cfg, "Categories", {})
         for category in categories:
             btn = Button(
-                categories_frame,
+                self.categories_frame,
                 text=category,
                 width=28,
                 bg="black",
@@ -2442,8 +2588,8 @@ class TermForgeApp:
 
         Label(
             frame,
-            text="Use the Tools menu for windows, history, plugins, and hotkeys.",
-            width=44,
+            text="Use the Tools menu for windows, history, plugins, hotkeys, and editors.",
+            width=56,
             bg="#f7f7d0",
             fg="black",
             relief="groove",
@@ -2456,7 +2602,7 @@ class TermForgeApp:
             anchor="w",
             justify="left",
             width=40,
-            wraplength=320,
+            wraplength=420,
             bg="#f0f0f0",
             fg="black",
             relief="sunken",
