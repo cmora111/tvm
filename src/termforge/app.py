@@ -1253,6 +1253,67 @@ class CommandPaletteWindow:
         self.refresh()
         self.search_entry.focus_set()
 
+
+    def fuzzy_match_score(self, query: str, text: str):
+        query = query.strip().lower()
+        text = text.lower()
+
+        if not query:
+            return 0
+
+        # best case: exact match
+        if query == text:
+            return 0
+
+        # very good: prefix match
+        if text.startswith(query):
+            return 1
+
+        # good: substring match
+        idx = text.find(query)
+        if idx != -1:
+            return 10 + idx
+
+        # fallback: subsequence match
+        pos = -1
+        gap_penalty = 0
+        first_idx = None
+
+        for ch in query:
+            idx = text.find(ch, pos + 1)
+            if idx == -1:
+                return None
+            if first_idx is None:
+                first_idx = idx
+            if pos != -1:
+                gap_penalty += idx - pos - 1
+            pos = idx
+
+        return 100 + gap_penalty + (first_idx or 0)
+
+    def item_match_score(self, query: str, item: dict):
+        query = query.strip().lower()
+        if not query:
+            return 0
+
+        name_score = self.fuzzy_match_score(query, item["name"])
+        category_score = self.fuzzy_match_score(query, item["category"])
+        preview_score = self.fuzzy_match_score(query, item["preview"])
+
+        candidates = []
+
+        if name_score is not None:
+            candidates.append(name_score)          # strongest priority
+        if category_score is not None:
+            candidates.append(1000 + category_score)
+        if preview_score is not None:
+            candidates.append(2000 + preview_score)
+
+        if not candidates:
+            return None
+
+        return min(candidates)
+
     def collect_commands(self):
         items = []
         categories = getattr(self.app.cfg, "Categories", {})
@@ -1304,8 +1365,27 @@ class CommandPaletteWindow:
     def refresh(self, *_args):
         query = self.query_var.get().strip().lower()
         self.snapshot = self.collect_commands()
+
         if query:
-            self.filtered = [item for item in self.snapshot if query in item["search_blob"]]
+            scored = []
+            for item in self.snapshot:
+                score = self.item_match_score(query, item)
+                if score is not None:
+                    enriched = dict(item)
+                    enriched["match_score"] = score
+                    scored.append(enriched)
+
+            scored.sort(
+                key=lambda item: (
+                    not item["favorite"],
+                    not item["recent"],
+                    item["match_score"],
+                    item["recent_rank"],
+                    item["category"].lower(),
+                    item["name"].lower(),
+                )
+            )
+            self.filtered = scored
         else:
             self.filtered = list(self.snapshot)
 
