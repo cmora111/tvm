@@ -1477,6 +1477,7 @@ class TermForgeApp:
         self.log("Starting TermForge")
         self.load_plugins(force=True)
         self.build_main()
+        self.bind_global_shortcuts()
         self.initialize_hotkeys()
         self.root.after(250, self.safe_initial_select)
 
@@ -2441,9 +2442,11 @@ class TermForgeApp:
 
     def open_command_palette(self, event=None) -> None:
         CommandPaletteWindow(self)
+        return "break"
 
     def bind_global_shortcuts(self) -> None:
         self.root.bind_all("<Control-p>", self.open_command_palette)
+        self.root.bind_all("<Control-P>", self.open_command_palette)
 
 
     def persist_full_config(self) -> None:
