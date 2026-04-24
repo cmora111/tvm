@@ -948,13 +948,27 @@ class CommandEditorWindow:
         self.update_type_ui()
 
     def clear_form(self):
-        self.category_var.set("")
-        self.name_var.set("")
-        self.type_var.set("2")
-        self.command_text.delete("1.0", END)
-        self.options_text.delete("1.0", END)
-        self.options_text.insert("1.0", "{}")
-        self.update_type_ui()
+        try:
+            if hasattr(self, "category_choices") and self.category_choices:
+                self.category_var.set(self.category_choices[0])
+            else:
+                self.category_var.set("")
+
+            self.name_var.set("")
+
+            if hasattr(self, "type_var"):
+                self.type_var.set("Send To Window")
+
+            if hasattr(self, "command_text") and self.command_text.winfo_exists():
+                self.command_text.delete("1.0", END)
+
+            if hasattr(self, "options_text") and self.options_text.winfo_exists():
+                self.options_text.delete("1.0", END)
+                self.options_text.insert("1.0", "{}")
+
+            self.update_type_ui()
+        except Exception:
+            pass
 
     def _parse_form(self):
         category = self.category_var.get().strip()
@@ -1008,17 +1022,26 @@ class CommandEditorWindow:
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
         categories = getattr(self.app.cfg, "Categories", {})
+
         if category not in categories or name not in categories[category]:
             messagebox.showerror("Command Editor", "Selected command was not found.")
             return
+
         del categories[category][name]
         if not categories[category]:
             del categories[category]
+
         self.app.persist_categories()
-        self.app.reload_from_config_with_notice(silent=True)
+        self.app.rebuild_category_buttons()
         self.app.set_status(f"Deleted command {category}/{name}")
-        self.clear_form()
-        self.refresh()
+
+        try:
+            if self.window.winfo_exists():
+                self.clear_form()
+                if hasattr(self, "listbox") and self.listbox.winfo_exists():
+                    self.refresh()
+        except Exception:
+            pass
 
 
 class CategoryEditorWindow:
@@ -1296,23 +1319,34 @@ class CommandPaletteWindow:
         if not query:
             return 0
 
-        name_score = self.fuzzy_match_score(query, item["name"])
-        category_score = self.fuzzy_match_score(query, item["category"])
-        preview_score = self.fuzzy_match_score(query, item["preview"])
+        terms = [term for term in query.split() if term]
+        if not terms:
+            return 0
 
-        candidates = []
+        total_score = 0
 
-        if name_score is not None:
-            candidates.append(name_score)          # strongest priority
-        if category_score is not None:
-            candidates.append(1000 + category_score)
-        if preview_score is not None:
-            candidates.append(2000 + preview_score)
+        for term in terms:
+            name_score = self.fuzzy_match_score(term, item["name"])
+            category_score = self.fuzzy_match_score(term, item["category"])
+            preview_score = self.fuzzy_match_score(term, item["preview"])
 
-        if not candidates:
-            return None
+            candidates = []
 
-        return min(candidates)
+            if name_score is not None:
+                candidates.append(name_score)
+
+            if category_score is not None:
+                candidates.append(1000 + category_score)
+
+            if preview_score is not None:
+                candidates.append(2000 + preview_score)
+
+            if not candidates:
+                return None
+
+            total_score += min(candidates)
+
+        return total_score
 
     def section_label_for_item(self, item):
         if item.get("favorite"):
