@@ -1375,6 +1375,7 @@ class CommandPaletteWindow:
     def collect_commands(self):
         items = []
         categories = getattr(self.app.cfg, "Categories", {})
+        usage = self.app.get_usage()
         favorites = set((c, s) for c, s in self.app.get_favorites())
         recent_list = self.app.get_recent()
         recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
@@ -1391,6 +1392,7 @@ class CommandPaletteWindow:
                 except Exception:
                     cmd_type, cmd, options = "?", repr(entry), {}
 
+                usage_count = int(usage.get(f"{category}/{name}", 0))
                 preview = cmd if isinstance(cmd, str) else str(cmd)
                 is_favorite = (category, name) in favorites
                 is_recent = (category, name) in recent
@@ -1398,6 +1400,7 @@ class CommandPaletteWindow:
 
                 items.append({
                     "category": category,
+                    "usage_count": usage_count,
                     "name": name,
                     "entry": entry,
                     "type": cmd_type,
@@ -1414,6 +1417,7 @@ class CommandPaletteWindow:
                 not item["favorite"],
                 not item["recent"],
                 item["recent_rank"],
+                item["usage_count"],
                 item["category"].lower(),
                 item["name"].lower(),
             )
@@ -1439,6 +1443,7 @@ class CommandPaletteWindow:
                     not item["recent"],
                     item["match_score"],
                     item["recent_rank"],
+                    item["usage_count"],
                     item["category"].lower(),
                     item["name"].lower(),
                 )
@@ -1512,6 +1517,7 @@ class CommandPaletteWindow:
             f'Category: {item["category"]}',
             f'Command: {item["name"]}',
             f'Type: {item["type"]}',
+            f'Usage: {item.get("usage_count", 0)}',
             "",
             "Preview:",
             item["preview"],
@@ -2297,6 +2303,7 @@ class TermForgeApp:
         entry = self.cfg.Categories[category][subcategory]
         cmd_type, cmd, options = parse_command_entry(entry)
         self.add_recent(category, subcategory)
+        self.add_usage(category, subcategory)
         self.run_cmd(cmd_type, cmd, options, parent_window)
 
     def run_favorite(self, category: str, subcategory: str) -> None:
@@ -2537,6 +2544,7 @@ class TermForgeApp:
             hotkeys = getattr(self.cfg, "Hotkeys", {})
             disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
             categories = getattr(self.cfg, "Categories", {})
+            usage = getattr(self.cfg, "Usage", {})
 
             lines = [
                 "# TermForge user configuration",
@@ -2550,6 +2558,7 @@ class TermForgeApp:
                 f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
                 f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
                 f"Categories = {pprint.pformat(categories, indent=4)}",
+                f"Usage = (pprint.pformat(usage, indent=4))",
                 "",
             ]
 
@@ -2651,6 +2660,20 @@ class TermForgeApp:
             )
             btn.pack(pady=2)
             self.category_buttons[category] = btn
+
+    def get_usage(self) -> dict:
+        usage = getattr(self.cfg, "Usage", {})
+        if not isinstance(usage, dict):
+            usage = {}
+            setattr(self.cfg, "Usage", usage)
+        return usage
+
+    def add_usage(self, category: str, command: str) -> None:
+        usage = self.get_usage()
+        key = f"{category}/{command}"
+        usage[key] = int(usage.get(key, 0)) + 1
+        self.persist_full_config()
+
 
     def build_menu(self) -> None:
         menubar = Menu(self.root)
