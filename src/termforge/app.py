@@ -1314,6 +1314,13 @@ class CommandPaletteWindow:
 
         return min(candidates)
 
+    def section_label_for_item(self, item):
+        if item.get("favorite"):
+            return "★ Favorites"
+        if item.get("recent"):
+            return "⟳ Recent"
+        return "All Commands"
+
     def collect_commands(self):
         items = []
         categories = getattr(self.app.cfg, "Categories", {})
@@ -1390,40 +1397,60 @@ class CommandPaletteWindow:
             self.filtered = list(self.snapshot)
 
         self.listbox.delete(0, END)
+
+        self.list_index_to_item = {}
+        current_section = None
+
         for item in self.filtered:
+            section = self.section_label_for_item(item)
+
+            if section != current_section:
+                current_section = section
+                self.listbox.insert(END, section)
+                self.listbox.itemconfig(END, fg="blue")
+
             if item["favorite"]:
                 prefix = "★ "
             elif item["recent"]:
                 prefix = "⟳ "
             else:
                 prefix = "  "
+
+            display_index = self.listbox.size()
             self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}')
+            self.list_index_to_item[display_index] = item
 
         self.info.delete("1.0", END)
+
         if not self.filtered:
             self.info.insert("1.0", "No matching commands found.\n")
             return
 
-        self.listbox.selection_clear(0, END)
-        self.listbox.selection_set(0)
-        self.show_selected()
+        self.select_first_command_row()
 
-    def focus_listbox(self, _event=None):
-        if self.listbox.size() > 0:
-            self.listbox.focus_set()
-            if not self.listbox.curselection():
-                self.listbox.selection_set(0)
+    def select_first_command_row(self):
+        self.listbox.selection_clear(0, END)
+
+        for index in range(self.listbox.size()):
+            if index in getattr(self, "list_index_to_item", {}):
+                self.listbox.selection_set(index)
+                self.listbox.activate(index)
                 self.show_selected()
-        return "break"
+                return
 
     def selected_item(self):
         idxs = self.listbox.curselection()
         if not idxs:
             return None
-        idx = idxs[0]
-        if idx >= len(self.filtered):
-            return None
-        return self.filtered[idx]
+
+        index = idxs[0]
+        return getattr(self, "list_index_to_item", {}).get(index)
+
+    def focus_listbox(self, _event=None):
+        if self.listbox.size() > 0:
+            self.listbox.focus_set()
+            self.select_first_command_row()
+        return "break"
 
     def show_selected(self, _event=None):
         item = self.selected_item()
