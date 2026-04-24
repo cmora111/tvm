@@ -1417,7 +1417,7 @@ class CommandPaletteWindow:
                 not item["favorite"],
                 not item["recent"],
                 item["recent_rank"],
-                item["usage_count"],
+                -item["usage_count"],
                 item["category"].lower(),
                 item["name"].lower(),
             )
@@ -1463,7 +1463,7 @@ class CommandPaletteWindow:
             if section != current_section:
                 current_section = section
                 self.listbox.insert(END, section)
-                self.listbox.itemconfig(END, fg="blue")
+                self.listbox.itemconfig(END, fg="blue", bg="#eeeeee")
 
             if item["favorite"]:
                 prefix = "★ "
