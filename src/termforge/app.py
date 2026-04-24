@@ -885,6 +885,15 @@ class CommandEditorWindow:
         )
         help_box.config(state="disabled")
 
+        self.type_choices = {
+            "Select Window": "0",
+            "Spawn Terminal": "1",
+            "Send To Window": "2",
+            "Detached Command": "3",
+            "Chain": "chain",
+            "Plugin": "plugin",
+        }
+
         self.snapshot = []
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.type_var.trace_add("write", self.update_type_ui)
@@ -973,7 +982,7 @@ class CommandEditorWindow:
     def _parse_form(self):
         category = self.category_var.get().strip()
         name = self.name_var.get().strip()
-        cmd_type_raw = self.type_var.get().strip()
+        cmd_type_raw = self.type_choices.get(self.type_var.get(), self.type_var.get()).strip()
         command_raw = self.command_text.get("1.0", END).strip()
         options_raw = self.options_text.get("1.0", END).strip() or "{}"
 
@@ -985,6 +994,9 @@ class CommandEditorWindow:
             command = json.loads(command_raw) if command_raw else []
             if not isinstance(command, list):
                 raise ValueError("Chain JSON must decode to a list.")
+        elif cmd_type_raw.lower() == "plugin":
+            cmd_type = "plugin"
+            command = command_raw
         else:
             try:
                 cmd_type = int(cmd_type_raw)
@@ -1014,9 +1026,15 @@ class CommandEditorWindow:
 
         categories[category][name] = entry
         self.app.persist_categories()
-        self.app.reload_from_config_with_notice(silent=True)
+        self.app.rebuild_category_buttons()
         self.app.set_status(f"Saved command {category}/{name}")
-        self.refresh()
+
+        try:
+            if self.window.winfo_exists():
+                if hasattr(self, "listbox") and self.listbox.winfo_exists():
+                    self.refresh()
+        except Exception:
+            pass
 
     def delete_entry(self):
         category = self.category_var.get().strip()
@@ -1037,7 +1055,6 @@ class CommandEditorWindow:
 
         try:
             if self.window.winfo_exists():
-                self.clear_form()
                 if hasattr(self, "listbox") and self.listbox.winfo_exists():
                     self.refresh()
         except Exception:
