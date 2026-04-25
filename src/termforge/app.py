@@ -89,6 +89,7 @@ def ensure_user_config() -> None:
         "Windows = {}",
         f"Favorites = {repr(getattr(default_config, 'Favorites', [])) if hasattr(default_config, 'Favorites') else '[]'}",
         "Recent = []",
+        "Usage = {}",
         "Hotkeys = {}",
         "DisabledPlugins = []",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
@@ -1375,7 +1376,6 @@ class CommandPaletteWindow:
     def collect_commands(self):
         items = []
         categories = getattr(self.app.cfg, "Categories", {})
-        usage = self.app.get_usage()
         favorites = set((c, s) for c, s in self.app.get_favorites())
         recent_list = self.app.get_recent()
         recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
@@ -1392,7 +1392,6 @@ class CommandPaletteWindow:
                 except Exception:
                     cmd_type, cmd, options = "?", repr(entry), {}
 
-                usage_count = int(usage.get(f"{category}/{name}", 0))
                 preview = cmd if isinstance(cmd, str) else str(cmd)
                 is_favorite = (category, name) in favorites
                 is_recent = (category, name) in recent
@@ -1400,7 +1399,6 @@ class CommandPaletteWindow:
 
                 items.append({
                     "category": category,
-                    "usage_count": usage_count,
                     "name": name,
                     "entry": entry,
                     "type": cmd_type,
@@ -1417,7 +1415,6 @@ class CommandPaletteWindow:
                 not item["favorite"],
                 not item["recent"],
                 item["recent_rank"],
-                -item["usage_count"],
                 item["category"].lower(),
                 item["name"].lower(),
             )
@@ -1443,7 +1440,6 @@ class CommandPaletteWindow:
                     not item["recent"],
                     item["match_score"],
                     item["recent_rank"],
-                    item["usage_count"],
                     item["category"].lower(),
                     item["name"].lower(),
                 )
@@ -1463,7 +1459,7 @@ class CommandPaletteWindow:
             if section != current_section:
                 current_section = section
                 self.listbox.insert(END, section)
-                self.listbox.itemconfig(END, fg="blue", bg="#eeeeee")
+                self.listbox.itemconfig(END, fg="blue")
 
             if item["favorite"]:
                 prefix = "★ "
@@ -1517,7 +1513,6 @@ class CommandPaletteWindow:
             f'Category: {item["category"]}',
             f'Command: {item["name"]}',
             f'Type: {item["type"]}',
-            f'Usage: {item.get("usage_count", 0)}',
             "",
             "Preview:",
             item["preview"],
@@ -2302,8 +2297,10 @@ class TermForgeApp:
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
         entry = self.cfg.Categories[category][subcategory]
         cmd_type, cmd, options = parse_command_entry(entry)
+
         self.add_recent(category, subcategory)
         self.add_usage(category, subcategory)
+
         self.run_cmd(cmd_type, cmd, options, parent_window)
 
     def run_favorite(self, category: str, subcategory: str) -> None:
@@ -2428,56 +2425,19 @@ class TermForgeApp:
         info.pack(fill=BOTH, expand=True)
         selected_entry = {"value": None}
 
-        def refresh() -> None:
-            listbox.delete(0, END)
-            for entry in self.command_history:
-                label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
-                listbox.insert(END, label)
-            info.delete("1.0", END)
-            info.insert("1.0", "Select a history entry to inspect or rerun.\n")
+    def get_usage(self) -> dict:
+        usage = getattr(self.cfg, "Usage", {})
+        if not isinstance(usage, dict):
+            usage = {}
+            setattr(self.cfg, "Usage", usage)
+        return usage
 
-        def show_selected(_event=None) -> None:
-            idxs = listbox.curselection()
-            if not idxs:
-                return
-            entry = self.command_history[idxs[0]]
-            selected_entry["value"] = entry
-            lines = [
-                f"Time: {entry.get('timestamp','')}",
-                f"Action: {entry.get('action_type','')}",
-                f"Source: {entry.get('source','')}",
-                f"Window ID: {entry.get('window_id','')}",
-                "",
-                "Command:",
-                entry.get("command", ""),
-            ]
-            info.delete("1.0", END)
-            info.insert("1.0", "\n".join(lines))
 
-        def rerun_selected() -> None:
-            entry = selected_entry["value"]
-            if not entry:
-                self.set_status("Select a history entry first.")
-                return
-            self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
-
-        def clear_history() -> None:
-            if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
-                return
-            self.command_history = []
-            self.save_state()
-            refresh()
-            self.set_status("Command history cleared.")
-
-        buttons = Frame(outer)
-        buttons.pack(fill=X, pady=(8, 0))
-        Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Clear History", command=clear_history, bg="#7f6000", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
-
-        listbox.bind("<<ListboxSelect>>", show_selected)
-        refresh()
-
+    def add_usage(self, category: str, command: str) -> None:
+        usage = self.get_usage()
+        key = f"{category}/{command}"
+        usage[key] = int(usage.get(key, 0)) + 1
+        self.persist_full_config()
 
 
     def parse_command_entry_public(self, entry):
@@ -2541,10 +2501,10 @@ class TermForgeApp:
             windows = getattr(self.cfg, "Windows", {})
             favorites = getattr(self.cfg, "Favorites", [])
             recent = getattr(self.cfg, "Recent", [])
+            usage = getattr(self.cfg, "Usage", {})
             hotkeys = getattr(self.cfg, "Hotkeys", {})
             disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
             categories = getattr(self.cfg, "Categories", {})
-            usage = getattr(self.cfg, "Usage", {})
 
             lines = [
                 "# TermForge user configuration",
@@ -2555,10 +2515,10 @@ class TermForgeApp:
                 f"Windows = {pprint.pformat(windows, indent=4)}",
                 f"Favorites = {pprint.pformat(favorites, indent=4)}",
                 f"Recent = {pprint.pformat(recent, indent=4)}",
+                f"Usage = {pprint.pformat(usage, indent=4)}",
                 f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
                 f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
                 f"Categories = {pprint.pformat(categories, indent=4)}",
-                f"Usage = (pprint.pformat(usage, indent=4))",
                 "",
             ]
 
@@ -2660,20 +2620,6 @@ class TermForgeApp:
             )
             btn.pack(pady=2)
             self.category_buttons[category] = btn
-
-    def get_usage(self) -> dict:
-        usage = getattr(self.cfg, "Usage", {})
-        if not isinstance(usage, dict):
-            usage = {}
-            setattr(self.cfg, "Usage", usage)
-        return usage
-
-    def add_usage(self, category: str, command: str) -> None:
-        usage = self.get_usage()
-        key = f"{category}/{command}"
-        usage[key] = int(usage.get(key, 0)) + 1
-        self.persist_full_config()
-
 
     def build_menu(self) -> None:
         menubar = Menu(self.root)
