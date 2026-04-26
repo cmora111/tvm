@@ -504,16 +504,14 @@ class PluginManagerWindow:
         self.info.insert("1.0", "\n".join(lines))
 
     def run_selected(self):
-        item = self.current_item()
+        item = self.selected_item()
+
         if not item:
             return
-        if item["status"] != "loaded":
-            messagebox.showerror("Plugin Manager", "Only loaded plugins can be run.")
-            return
-        try:
-            self.app.run_plugin(item["name"])
-        except Exception as exc:
-            messagebox.showerror("Plugin Manager", str(exc))
+
+        self.window.destroy()
+        self.app.set_status(f'Palette run: {item["category"]}/{item["name"]}')
+        self.app.select_cmd(None, item["category"], item["name"])
 
     def disable_selected(self):
         item = self.current_item()
@@ -1132,23 +1130,23 @@ class CategoryEditorWindow:
         self.info.insert("1.0", "Select a category to inspect.\n")
 
     def show_selected(self, _event=None):
-        idxs = self.listbox.curselection()
-        if not idxs:
-            return
-        name, count = self.snapshot[idxs[0]]
-        commands = self.get_categories().get(name, {})
-        lines = [
-            f"Category: {name}",
-            f"Commands: {count}",
-            "",
-        ]
-        if isinstance(commands, dict) and commands:
-            lines.append("Entries:")
-            for command_name in sorted(commands.keys()):
-                lines.append(f"  - {command_name}")
-        else:
-            lines.append("This category is empty.")
+        item = self.selected_item()
+
         self.info.delete("1.0", END)
+
+        if not item:
+            return
+
+        lines = [
+            f'Category: {item["category"]}',
+            f'Command: {item["name"]}',
+            f'Type: {item["type"]}',
+            f'Usage: {item.get("usage_count", 0)}',
+            "",
+            "Preview:",
+            item["preview"],
+        ]
+
         self.info.insert("1.0", "\n".join(lines))
 
     def selected_category_name(self):
@@ -1379,6 +1377,7 @@ class CommandPaletteWindow:
         favorites = set((c, s) for c, s in self.app.get_favorites())
         recent_list = self.app.get_recent()
         recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
+        usage = self.app.get_usage()
 
         for category in sorted(categories.keys()):
             commands = categories.get(category, {})
@@ -1392,6 +1391,7 @@ class CommandPaletteWindow:
                 except Exception:
                     cmd_type, cmd, options = "?", repr(entry), {}
 
+                usage_count = int(usage.get(f"{category}/{name}", 0))
                 preview = cmd if isinstance(cmd, str) else str(cmd)
                 is_favorite = (category, name) in favorites
                 is_recent = (category, name) in recent
@@ -1407,6 +1407,7 @@ class CommandPaletteWindow:
                     "favorite": is_favorite,
                     "recent": is_recent,
                     "recent_rank": recent_rank,
+                    "usage_count": usage_count,
                     "search_blob": f"{category} {name} {preview}".lower(),
                 })
 
@@ -1415,6 +1416,7 @@ class CommandPaletteWindow:
                 not item["favorite"],
                 not item["recent"],
                 item["recent_rank"],
+                -item["usage_count"],
                 item["category"].lower(),
                 item["name"].lower(),
             )
@@ -1436,12 +1438,13 @@ class CommandPaletteWindow:
 
             scored.sort(
                 key=lambda item: (
-                    not item["favorite"],
-                    not item["recent"],
-                    item["match_score"],
-                    item["recent_rank"],
-                    item["category"].lower(),
-                    item["name"].lower(),
+                    not item.get("favorite", False),
+                    not item.get("recent", False),
+                    item.get("match_score", 999),
+                    item.get("recent_rank", 999),
+                    -item.get("usage_count", 0),
+                    item.get("category", "").lower(),
+                    item.get("name", "").lower(),
                 )
             )
             self.filtered = scored
@@ -1449,32 +1452,57 @@ class CommandPaletteWindow:
             self.filtered = list(self.snapshot)
 
         self.listbox.delete(0, END)
+        self.list_rows = []
 
-        self.list_index_to_item = {}
-        current_section = None
+        def add_spacer():
+            self.listbox.insert(END, "")
+            self.list_rows.append(None)
 
-        for item in self.filtered:
-            section = self.section_label_for_item(item)
+        def add_header(title: str):
+            if self.listbox.size() > 0:
+                add_spacer()
 
-            if section != current_section:
-                current_section = section
-                self.listbox.insert(END, section)
-                self.listbox.itemconfig(END, fg="blue")
+            self.listbox.insert(END, title)
+            header_index = self.listbox.size() - 1
+            self.listbox.itemconfig(header_index, fg="blue", bg="#eeeeee")
+            self.list_rows.append(None)
 
-            if item["favorite"]:
+        def add_command(item: dict):
+            if item.get("favorite"):
                 prefix = "★ "
-            elif item["recent"]:
+            elif item.get("recent"):
                 prefix = "⟳ "
             else:
                 prefix = "  "
 
-            display_index = self.listbox.size()
-            self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}')
-            self.list_index_to_item[display_index] = item
+            usage = item.get("usage_count", 0)
+            suffix = f"  ({usage})" if usage else ""
+
+            self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}{suffix}')
+            self.list_rows.append(item)
+
+        favorites = [i for i in self.filtered if i.get("favorite")]
+        recents = [i for i in self.filtered if i.get("recent") and not i.get("favorite")]
+        all_items = [i for i in self.filtered if not i.get("favorite") and not i.get("recent")]
+
+        if favorites:
+            add_header("★ Favorites")
+            for item in favorites:
+                add_command(item)
+
+        if recents:
+            add_header("⟳ Recent")
+            for item in recents:
+                add_command(item)
+
+        if all_items:
+            add_header("All Commands")
+            for item in all_items:
+                add_command(item)
 
         self.info.delete("1.0", END)
 
-        if not self.filtered:
+        if not any(row is not None for row in self.list_rows):
             self.info.insert("1.0", "No matching commands found.\n")
             return
 
@@ -1496,7 +1524,14 @@ class CommandPaletteWindow:
             return None
 
         index = idxs[0]
-        return getattr(self, "list_index_to_item", {}).get(index)
+
+        if not hasattr(self, "list_rows"):
+            return None
+
+        if index < 0 or index >= len(self.list_rows):
+            return None
+
+        return self.list_rows[index]
 
     def focus_listbox(self, _event=None):
         if self.listbox.size() > 0:
