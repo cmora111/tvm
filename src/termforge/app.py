@@ -1391,11 +1391,11 @@ class CommandPaletteWindow:
                 except Exception:
                     cmd_type, cmd, options = "?", repr(entry), {}
 
-                usage_count = int(usage.get(f"{category}/{name}", 0))
                 preview = cmd if isinstance(cmd, str) else str(cmd)
                 is_favorite = (category, name) in favorites
                 is_recent = (category, name) in recent
                 recent_rank = recent.get((category, name), 999)
+                usage_count = int(usage.get(f"{category}/{name}", 0))
 
                 items.append({
                     "category": category,
@@ -1442,7 +1442,7 @@ class CommandPaletteWindow:
                     not item.get("recent", False),
                     item.get("match_score", 999),
                     item.get("recent_rank", 999),
-                    -item.get("usage_count", 0),
+                    item.get("usage_count", 0),
                     item.get("category", "").lower(),
                     item.get("name", "").lower(),
                 )
@@ -1476,14 +1476,39 @@ class CommandPaletteWindow:
                 prefix = "  "
 
             usage = item.get("usage_count", 0)
-            suffix = f"  ({usage})" if usage else ""
+
+            if item.get("favorite"):
+                suffix = ""
+            else:
+                suffix = f"  ({usage})" if usage > 0 else ""
 
             self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}{suffix}')
             self.list_rows.append(item)
 
         favorites = [i for i in self.filtered if i.get("favorite")]
-        recents = [i for i in self.filtered if i.get("recent") and not i.get("favorite")]
-        all_items = [i for i in self.filtered if not i.get("favorite") and not i.get("recent")]
+
+        recents = [
+            i for i in self.filtered
+            if i.get("recent")
+            and not i.get("favorite")
+            and i.get("usage_count", 0) == 0
+        ]
+
+        most_used = sorted(
+            [
+                i for i in self.filtered
+                if i.get("usage_count", 0) > 0
+                and not i.get("favorite")
+            ],
+            key=lambda x: -x.get("usage_count", 0)
+        )
+
+        all_items = [
+            i for i in self.filtered
+            if not i.get("favorite")
+            and not i.get("recent")
+            and i.get("usage_count", 0) == 0
+        ]
 
         if favorites:
             add_header("★ Favorites")
@@ -1493,6 +1518,11 @@ class CommandPaletteWindow:
         if recents:
             add_header("⟳ Recent")
             for item in recents:
+                add_command(item)
+
+        if most_used:
+            add_header("🔥 Most Used")
+            for item in most_used[:10]:
                 add_command(item)
 
         if all_items:
