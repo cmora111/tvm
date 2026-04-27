@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import time
+import copy
 import traceback
 from datetime import datetime
 
@@ -1323,6 +1324,10 @@ class CommandPaletteWindow:
         self.window.bind("<Control-E>", self.edit_selected)
         self.listbox.bind("<Control-e>", self.edit_selected)
         self.listbox.bind("<Control-E>", self.edit_selected)
+        self.window.bind("<Control-d>", self.duplicate_selected)
+        self.window.bind("<Control-D>", self.duplicate_selected)
+        self.listbox.bind("<Control-d>", self.duplicate_selected)
+        self.listbox.bind("<Control-D>", self.duplicate_selected)
 
         self.refresh()
         self.search_entry.focus_set()
@@ -1616,9 +1621,11 @@ class CommandPaletteWindow:
             "",
             "Preview:",
             item["preview"],
+            "",
             "Shortcuts:",
             "  Enter      -> Run command",
             "  Ctrl+E     -> Edit command",
+            "  Ctrl+D     -> Duplicate command",
             "  Escape     -> Close palette",
         ]
         self.info.insert("1.0", "\n".join(lines))
@@ -1641,6 +1648,24 @@ class CommandPaletteWindow:
 
         editor = CommandEditorWindow(self.app)
         editor.load_command(item["category"], item["name"])
+
+        return "break"
+
+    def duplicate_selected(self, event=None):
+        item = self.selected_item()
+
+        if not item:
+            return "break"
+
+        self.app.duplicate_command(
+            item["category"],
+            item["name"]
+        )
+
+        self.refresh()
+        self.app.set_status(
+            f'Duplicated {item["category"]}/{item["name"]}'
+        )
 
         return "break"
 
@@ -2365,6 +2390,35 @@ class TermForgeApp:
         self.add_history_entry("chain", f"{total} steps", source=source)
         self.set_status(f"Chain complete: {total} step(s).")
         runner.finished()
+
+    def duplicate_command(self, category: str, name: str) -> None:
+        categories = getattr(self.cfg, "Categories", {})
+
+        if category not in categories:
+            return
+
+        commands = categories[category]
+
+        if name not in commands:
+            return
+
+        original = copy.deepcopy(commands[name])
+
+        # strip prior Copy suffix if duplicating a copy
+        base_name = re.sub(r' Copy(?: \d+)?$', '', name)
+
+        base = f"{base_name} Copy"
+        new_name = base
+        counter = 2
+
+        while new_name in commands:
+            new_name = f"{base} {counter}"
+            counter += 1
+
+        commands[new_name] = original
+
+        self.persist_categories()
+        self.rebuild_category_buttons()
 
     def run_cmd(
         self,
