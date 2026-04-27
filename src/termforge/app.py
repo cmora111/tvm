@@ -1059,6 +1059,37 @@ class CommandEditorWindow:
         except Exception:
             pass
 
+    def load_command(self, category: str, name: str) -> None:
+        categories = getattr(self.app.cfg, "Categories", {})
+
+        if category not in categories or name not in categories[category]:
+            messagebox.showerror(
+                "Command Editor",
+                f"Command not found: {category}/{name}"
+            )
+            return
+
+        entry = categories[category][name]
+
+        self.category_var.set(category)
+        self.name_var.set(name)
+
+        cmd_type, cmd, options = self.app.parse_command_entry_public(entry)
+
+        reverse_type_choices = {v: k for k, v in self.type_choices.items()}
+        self.type_var.set(reverse_type_choices.get(str(cmd_type), "Send To Window"))
+
+        self.command_text.delete("1.0", END)
+        if isinstance(cmd, str):
+            self.command_text.insert("1.0", cmd)
+        else:
+            self.command_text.insert("1.0", json.dumps(cmd, indent=2))
+
+        self.options_text.delete("1.0", END)
+        self.options_text.insert("1.0", json.dumps(options, indent=2) if options else "{}")
+
+        self.update_type_ui()
+
 
 class CategoryEditorWindow:
     def __init__(self, app):
@@ -1288,6 +1319,10 @@ class CommandPaletteWindow:
         self.listbox.bind("<Double-Button-1>", lambda _e: self.run_selected())
         self.listbox.bind("<Return>", lambda _e: self.run_selected())
         self.window.bind("<Escape>", lambda _e: self.window.destroy())
+        self.window.bind("<Control-e>", self.edit_selected)
+        self.window.bind("<Control-E>", self.edit_selected)
+        self.listbox.bind("<Control-e>", self.edit_selected)
+        self.listbox.bind("<Control-E>", self.edit_selected)
 
         self.refresh()
         self.search_entry.focus_set()
@@ -1581,6 +1616,10 @@ class CommandPaletteWindow:
             "",
             "Preview:",
             item["preview"],
+            "Shortcuts:",
+            "  Enter      -> Run command",
+            "  Ctrl+E     -> Edit command",
+            "  Escape     -> Close palette",
         ]
         self.info.insert("1.0", "\n".join(lines))
 
@@ -1591,6 +1630,19 @@ class CommandPaletteWindow:
         self.window.destroy()
         self.app.set_status(f'Palette run: {item["category"]}/{item["name"]}')
         self.app.select_cmd(None, item["category"], item["name"])
+
+    def edit_selected(self, event=None):
+        item = self.selected_item()
+
+        if not item:
+            return "break"
+
+        self.window.destroy()
+
+        editor = CommandEditorWindow(self.app)
+        editor.load_command(item["category"], item["name"])
+
+        return "break"
 
 class TermForgeApp:
     def __init__(self, root: Tk, cfg) -> None:
