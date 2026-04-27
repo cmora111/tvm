@@ -89,6 +89,7 @@ def ensure_user_config() -> None:
         "Windows = {}",
         f"Favorites = {repr(getattr(default_config, 'Favorites', [])) if hasattr(default_config, 'Favorites') else '[]'}",
         "Recent = []",
+        "Usage = {}",
         "Hotkeys = {}",
         "DisabledPlugins = []",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
@@ -503,16 +504,14 @@ class PluginManagerWindow:
         self.info.insert("1.0", "\n".join(lines))
 
     def run_selected(self):
-        item = self.current_item()
+        item = self.selected_item()
+
         if not item:
             return
-        if item["status"] != "loaded":
-            messagebox.showerror("Plugin Manager", "Only loaded plugins can be run.")
-            return
-        try:
-            self.app.run_plugin(item["name"])
-        except Exception as exc:
-            messagebox.showerror("Plugin Manager", str(exc))
+
+        self.window.destroy()
+        self.app.set_status(f'Palette run: {item["category"]}/{item["name"]}')
+        self.app.select_cmd(None, item["category"], item["name"])
 
     def disable_selected(self):
         item = self.current_item()
@@ -1131,23 +1130,23 @@ class CategoryEditorWindow:
         self.info.insert("1.0", "Select a category to inspect.\n")
 
     def show_selected(self, _event=None):
-        idxs = self.listbox.curselection()
-        if not idxs:
-            return
-        name, count = self.snapshot[idxs[0]]
-        commands = self.get_categories().get(name, {})
-        lines = [
-            f"Category: {name}",
-            f"Commands: {count}",
-            "",
-        ]
-        if isinstance(commands, dict) and commands:
-            lines.append("Entries:")
-            for command_name in sorted(commands.keys()):
-                lines.append(f"  - {command_name}")
-        else:
-            lines.append("This category is empty.")
+        item = self.selected_item()
+
         self.info.delete("1.0", END)
+
+        if not item:
+            return
+
+        lines = [
+            f'Category: {item["category"]}',
+            f'Command: {item["name"]}',
+            f'Type: {item["type"]}',
+            f'Usage: {item.get("usage_count", 0)}',
+            "",
+            "Preview:",
+            item["preview"],
+        ]
+
         self.info.insert("1.0", "\n".join(lines))
 
     def selected_category_name(self):
@@ -1378,6 +1377,7 @@ class CommandPaletteWindow:
         favorites = set((c, s) for c, s in self.app.get_favorites())
         recent_list = self.app.get_recent()
         recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
+        usage = self.app.get_usage()
 
         for category in sorted(categories.keys()):
             commands = categories.get(category, {})
@@ -1395,6 +1395,7 @@ class CommandPaletteWindow:
                 is_favorite = (category, name) in favorites
                 is_recent = (category, name) in recent
                 recent_rank = recent.get((category, name), 999)
+                usage_count = int(usage.get(f"{category}/{name}", 0))
 
                 items.append({
                     "category": category,
@@ -1406,6 +1407,7 @@ class CommandPaletteWindow:
                     "favorite": is_favorite,
                     "recent": is_recent,
                     "recent_rank": recent_rank,
+                    "usage_count": usage_count,
                     "search_blob": f"{category} {name} {preview}".lower(),
                 })
 
@@ -1414,6 +1416,7 @@ class CommandPaletteWindow:
                 not item["favorite"],
                 not item["recent"],
                 item["recent_rank"],
+                -item["usage_count"],
                 item["category"].lower(),
                 item["name"].lower(),
             )
@@ -1435,12 +1438,13 @@ class CommandPaletteWindow:
 
             scored.sort(
                 key=lambda item: (
-                    not item["favorite"],
-                    not item["recent"],
-                    item["match_score"],
-                    item["recent_rank"],
-                    item["category"].lower(),
-                    item["name"].lower(),
+                    not item.get("favorite", False),
+                    not item.get("recent", False),
+                    item.get("match_score", 999),
+                    item.get("recent_rank", 999),
+                    item.get("usage_count", 0),
+                    item.get("category", "").lower(),
+                    item.get("name", "").lower(),
                 )
             )
             self.filtered = scored
@@ -1448,32 +1452,87 @@ class CommandPaletteWindow:
             self.filtered = list(self.snapshot)
 
         self.listbox.delete(0, END)
+        self.list_rows = []
 
-        self.list_index_to_item = {}
-        current_section = None
+        def add_spacer():
+            self.listbox.insert(END, "")
+            self.list_rows.append(None)
 
-        for item in self.filtered:
-            section = self.section_label_for_item(item)
+        def add_header(title: str):
+            if self.listbox.size() > 0:
+                add_spacer()
 
-            if section != current_section:
-                current_section = section
-                self.listbox.insert(END, section)
-                self.listbox.itemconfig(END, fg="blue")
+            self.listbox.insert(END, title)
+            header_index = self.listbox.size() - 1
+            self.listbox.itemconfig(header_index, fg="blue", bg="#eeeeee")
+            self.list_rows.append(None)
 
-            if item["favorite"]:
+        def add_command(item: dict):
+            if item.get("favorite"):
                 prefix = "★ "
-            elif item["recent"]:
+            elif item.get("recent"):
                 prefix = "⟳ "
             else:
                 prefix = "  "
 
-            display_index = self.listbox.size()
-            self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}')
-            self.list_index_to_item[display_index] = item
+            usage = item.get("usage_count", 0)
+
+            if item.get("favorite"):
+                suffix = ""
+            else:
+                suffix = f"  ({usage})" if usage > 0 else ""
+
+            self.listbox.insert(END, f'{prefix}{item["category"]} -> {item["name"]}{suffix}')
+            self.list_rows.append(item)
+
+        favorites = [i for i in self.filtered if i.get("favorite")]
+
+        recents = [
+            i for i in self.filtered
+            if i.get("recent")
+            and not i.get("favorite")
+            and i.get("usage_count", 0) == 0
+        ]
+
+        most_used = sorted(
+            [
+                i for i in self.filtered
+                if i.get("usage_count", 0) > 0
+                and not i.get("favorite")
+            ],
+            key=lambda x: -x.get("usage_count", 0)
+        )
+
+        all_items = [
+            i for i in self.filtered
+            if not i.get("favorite")
+            and not i.get("recent")
+            and i.get("usage_count", 0) == 0
+        ]
+
+        if favorites:
+            add_header("★ Favorites")
+            for item in favorites:
+                add_command(item)
+
+        if recents:
+            add_header("⟳ Recent")
+            for item in recents:
+                add_command(item)
+
+        if most_used:
+            add_header("🔥 Most Used")
+            for item in most_used[:10]:
+                add_command(item)
+
+        if all_items:
+            add_header("All Commands")
+            for item in all_items:
+                add_command(item)
 
         self.info.delete("1.0", END)
 
-        if not self.filtered:
+        if not any(row is not None for row in self.list_rows):
             self.info.insert("1.0", "No matching commands found.\n")
             return
 
@@ -1495,7 +1554,14 @@ class CommandPaletteWindow:
             return None
 
         index = idxs[0]
-        return getattr(self, "list_index_to_item", {}).get(index)
+
+        if not hasattr(self, "list_rows"):
+            return None
+
+        if index < 0 or index >= len(self.list_rows):
+            return None
+
+        return self.list_rows[index]
 
     def focus_listbox(self, _event=None):
         if self.listbox.size() > 0:
@@ -2296,7 +2362,10 @@ class TermForgeApp:
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
         entry = self.cfg.Categories[category][subcategory]
         cmd_type, cmd, options = parse_command_entry(entry)
+
         self.add_recent(category, subcategory)
+        self.add_usage(category, subcategory)
+
         self.run_cmd(cmd_type, cmd, options, parent_window)
 
     def run_favorite(self, category: str, subcategory: str) -> None:
@@ -2421,56 +2490,19 @@ class TermForgeApp:
         info.pack(fill=BOTH, expand=True)
         selected_entry = {"value": None}
 
-        def refresh() -> None:
-            listbox.delete(0, END)
-            for entry in self.command_history:
-                label = f"{entry.get('timestamp','')}  [{entry.get('action_type','')}] {entry.get('command','')}"
-                listbox.insert(END, label)
-            info.delete("1.0", END)
-            info.insert("1.0", "Select a history entry to inspect or rerun.\n")
+    def get_usage(self) -> dict:
+        usage = getattr(self.cfg, "Usage", {})
+        if not isinstance(usage, dict):
+            usage = {}
+            setattr(self.cfg, "Usage", usage)
+        return usage
 
-        def show_selected(_event=None) -> None:
-            idxs = listbox.curselection()
-            if not idxs:
-                return
-            entry = self.command_history[idxs[0]]
-            selected_entry["value"] = entry
-            lines = [
-                f"Time: {entry.get('timestamp','')}",
-                f"Action: {entry.get('action_type','')}",
-                f"Source: {entry.get('source','')}",
-                f"Window ID: {entry.get('window_id','')}",
-                "",
-                "Command:",
-                entry.get("command", ""),
-            ]
-            info.delete("1.0", END)
-            info.insert("1.0", "\n".join(lines))
 
-        def rerun_selected() -> None:
-            entry = selected_entry["value"]
-            if not entry:
-                self.set_status("Select a history entry first.")
-                return
-            self.run_cmd(entry.get("action_type"), entry.get("command"), {}, None)
-
-        def clear_history() -> None:
-            if not messagebox.askokcancel("Clear History", "Clear saved command history?"):
-                return
-            self.command_history = []
-            self.save_state()
-            refresh()
-            self.set_status("Command history cleared.")
-
-        buttons = Frame(outer)
-        buttons.pack(fill=X, pady=(8, 0))
-        Button(buttons, text="Rerun Selected", command=rerun_selected, bg="#2f5597", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Clear History", command=clear_history, bg="#7f6000", fg="white", width=16).pack(side=LEFT, padx=(0, 6))
-        Button(buttons, text="Close", command=win.destroy, bg="red", fg="black", width=16).pack(side=RIGHT)
-
-        listbox.bind("<<ListboxSelect>>", show_selected)
-        refresh()
-
+    def add_usage(self, category: str, command: str) -> None:
+        usage = self.get_usage()
+        key = f"{category}/{command}"
+        usage[key] = int(usage.get(key, 0)) + 1
+        self.persist_full_config()
 
 
     def parse_command_entry_public(self, entry):
@@ -2534,6 +2566,7 @@ class TermForgeApp:
             windows = getattr(self.cfg, "Windows", {})
             favorites = getattr(self.cfg, "Favorites", [])
             recent = getattr(self.cfg, "Recent", [])
+            usage = getattr(self.cfg, "Usage", {})
             hotkeys = getattr(self.cfg, "Hotkeys", {})
             disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
             categories = getattr(self.cfg, "Categories", {})
@@ -2547,6 +2580,7 @@ class TermForgeApp:
                 f"Windows = {pprint.pformat(windows, indent=4)}",
                 f"Favorites = {pprint.pformat(favorites, indent=4)}",
                 f"Recent = {pprint.pformat(recent, indent=4)}",
+                f"Usage = {pprint.pformat(usage, indent=4)}",
                 f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
                 f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
                 f"Categories = {pprint.pformat(categories, indent=4)}",
