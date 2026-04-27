@@ -2404,7 +2404,10 @@ class TermForgeApp:
 
         original = copy.deepcopy(commands[name])
 
-        base = f"{name} Copy"
+        # strip prior Copy suffix if duplicating a copy
+        base_name = re.sub(r' Copy(?: \d+)?$', '', name)
+
+        base = f"{base_name} Copy"
         new_name = base
         counter = 2
 
