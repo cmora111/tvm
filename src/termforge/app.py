@@ -1328,6 +1328,8 @@ class CommandPaletteWindow:
         self.window.bind("<Control-D>", self.duplicate_selected)
         self.listbox.bind("<Control-d>", self.duplicate_selected)
         self.listbox.bind("<Control-D>", self.duplicate_selected)
+        self.window.bind("<Delete>", self.delete_selected)
+        self.listbox.bind("<Delete>", self.delete_selected)
 
         self.refresh()
         self.search_entry.focus_set()
@@ -1626,6 +1628,7 @@ class CommandPaletteWindow:
             "  Enter      -> Run command",
             "  Ctrl+E     -> Edit command",
             "  Ctrl+D     -> Duplicate command",
+            "  Delete     -> Delete command",
             "  Escape     -> Close palette",
         ]
         self.info.insert("1.0", "\n".join(lines))
@@ -1666,6 +1669,27 @@ class CommandPaletteWindow:
         self.app.set_status(
             f'Duplicated {item["category"]}/{item["name"]}'
         )
+
+        return "break"
+
+    def delete_selected(self, event=None):
+        item = self.selected_item()
+
+        if not item:
+            return "break"
+
+        category = item["category"]
+        name = item["name"]
+
+        if not messagebox.askokcancel(
+            "Delete Command",
+            f"Delete command '{category}/{name}'?"
+        ):
+            return "break"
+
+        self.app.delete_command(category, name)
+        self.refresh()
+        self.app.set_status(f"Deleted command {category}/{name}")
 
         return "break"
 
@@ -2419,6 +2443,42 @@ class TermForgeApp:
 
         self.persist_categories()
         self.rebuild_category_buttons()
+
+    def delete_command(self, category: str, name: str) -> None:
+        categories = getattr(self.cfg, "Categories", {})
+
+        if category not in categories:
+            return
+
+        commands = categories[category]
+
+        if name not in commands:
+            return
+
+        del commands[name]
+
+        # clean related metadata
+        self.remove_favorite(category, name)
+
+        recent = getattr(self.cfg, "Recent", [])
+        if isinstance(recent, list):
+            self.cfg.Recent = [
+                item for item in recent
+                if not (
+                    isinstance(item, (list, tuple))
+                    and len(item) >= 2
+                    and item[0] == category
+                    and item[1] == name
+                )
+            ]
+
+        usage = getattr(self.cfg, "Usage", {})
+        if isinstance(usage, dict):
+            usage.pop(f"{category}/{name}", None)
+
+        self.persist_full_config()
+        self.rebuild_category_buttons()
+        self.rebuild_favorites_bar()
 
     def run_cmd(
         self,
