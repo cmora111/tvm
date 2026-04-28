@@ -1328,8 +1328,14 @@ class CommandPaletteWindow:
         self.window.bind("<Control-D>", self.duplicate_selected)
         self.listbox.bind("<Control-d>", self.duplicate_selected)
         self.listbox.bind("<Control-D>", self.duplicate_selected)
+        self.window.bind("<Control-f>", self.toggle_favorite_selected)
+        self.window.bind("<Control-F>", self.toggle_favorite_selected)
+        self.listbox.bind("<Control-f>", self.toggle_favorite_selected)
+        self.listbox.bind("<Control-F>", self.toggle_favorite_selected)
         self.window.bind("<Delete>", self.delete_selected)
         self.listbox.bind("<Delete>", self.delete_selected)
+        self.window.bind("<F2>", self.rename_selected)
+        self.listbox.bind("<F2>", self.rename_selected)
 
         self.refresh()
         self.search_entry.focus_set()
@@ -1628,10 +1634,33 @@ class CommandPaletteWindow:
             "  Enter      -> Run command",
             "  Ctrl+E     -> Edit command",
             "  Ctrl+D     -> Duplicate command",
+            "  Ctrl+F     -> Toggle favorite",
+            "  F2         -> Rename command",
             "  Delete     -> Delete command",
             "  Escape     -> Close palette",
         ]
         self.info.insert("1.0", "\n".join(lines))
+
+    def toggle_favorite_selected(self, event=None):
+        item = self.selected_item()
+
+        if not item:
+            return "break"
+
+        category = item["category"]
+        name = item["name"]
+
+        if item.get("favorite"):
+            self.app.remove_favorite(category, name)
+            self.app.set_status(f"Removed favorite {category}/{name}")
+        else:
+            self.app.add_favorite(category, name)
+            self.app.set_status(f"Added favorite {category}/{name}")
+
+        self.app.rebuild_favorites_bar()
+        self.refresh()
+
+        return "break"
 
     def run_selected(self):
         item = self.selected_item()
@@ -1690,6 +1719,38 @@ class CommandPaletteWindow:
         self.app.delete_command(category, name)
         self.refresh()
         self.app.set_status(f"Deleted command {category}/{name}")
+
+        return "break"
+
+    def rename_selected(self, event=None):
+        item = self.selected_item()
+
+        if not item:
+            return "break"
+
+        category = item["category"]
+        old_name = item["name"]
+
+        prompt = MultiFieldPrompt(
+            self.window,
+            "Rename Command",
+            ["new_name"],
+            defaults={"new_name": old_name},
+            heading=f"Rename {category}/{old_name}",
+        )
+
+        values = prompt.show()
+        if values is None:
+            return "break"
+
+        new_name = values.get("new_name", "").strip()
+        if not new_name:
+            messagebox.showerror("Rename Command", "New command name is required.")
+            return "break"
+
+        self.app.rename_command(category, old_name, new_name)
+        self.refresh()
+        self.app.set_status(f"Renamed command {category}/{old_name} -> {new_name}")
 
         return "break"
 
@@ -1803,6 +1864,59 @@ class TermForgeApp:
                 if category in getattr(self.cfg, "Categories", {}) and subcategory in self.cfg.Categories[category]:
                     favs.append((category, subcategory))
         return favs
+
+    def rename_command(self, category: str, old_name: str, new_name: str) -> None:
+        categories = getattr(self.cfg, "Categories", {})
+
+        if category not in categories:
+            return
+
+        commands = categories[category]
+
+        if old_name not in commands:
+            return
+
+        if new_name in commands and new_name != old_name:
+            if not messagebox.askokcancel(
+                "Rename Command",
+                f"'{new_name}' already exists in '{category}'.\n\nOverwrite it?"
+            ):
+                return
+
+        commands[new_name] = commands.pop(old_name)
+
+        favorites = getattr(self.cfg, "Favorites", [])
+        if isinstance(favorites, list):
+            for item in favorites:
+                if (
+                    isinstance(item, list)
+                    and len(item) >= 2
+                    and item[0] == category
+                    and item[1] == old_name
+                ):
+                    item[1] = new_name
+
+        recent = getattr(self.cfg, "Recent", [])
+        if isinstance(recent, list):
+            for item in recent:
+                if (
+                    isinstance(item, list)
+                    and len(item) >= 2
+                    and item[0] == category
+                    and item[1] == old_name
+                ):
+                    item[1] = new_name
+
+        usage = getattr(self.cfg, "Usage", {})
+        if isinstance(usage, dict):
+            old_key = f"{category}/{old_name}"
+            new_key = f"{category}/{new_name}"
+            if old_key in usage:
+                usage[new_key] = usage.pop(old_key)
+
+        self.persist_full_config()
+        self.rebuild_category_buttons()
+        self.rebuild_favorites_bar()
 
     def get_windows_dict(self) -> dict:
         windows = getattr(self.cfg, "Windows", None)
