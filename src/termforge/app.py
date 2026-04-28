@@ -657,6 +657,10 @@ class ChainBuilderWindow:
         Button(btns, text="Close", width=12, bg="red", fg="black", command=self.close).pack(side=RIGHT)
 
         self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
+        self.window.bind("<Alt-Up>", self.move_up_shortcut)
+        self.window.bind("<Alt-Down>", self.move_down_shortcut)
+        self.listbox.bind("<Alt-Up>", self.move_up_shortcut)
+        self.listbox.bind("<Alt-Down>", self.move_down_shortcut)
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -789,21 +793,50 @@ class ChainBuilderWindow:
 
     def move_up(self):
         idxs = self.listbox.curselection()
-        if not idxs or idxs[0] == 0:
+        if not idxs:
             return
+
         i = idxs[0]
-        self.steps[i-1], self.steps[i] = self.steps[i], self.steps[i-1]
+        if i <= 0:
+            return
+
+        self.steps[i - 1], self.steps[i] = self.steps[i], self.steps[i - 1]
         self.refresh()
-        self.listbox.selection_set(i-1)
+
+        new_index = i - 1
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(new_index)
+        self.listbox.activate(new_index)
+        self.listbox.see(new_index)
+
 
     def move_down(self):
         idxs = self.listbox.curselection()
-        if not idxs or idxs[0] >= len(self.steps) - 1:
+        if not idxs:
             return
+
         i = idxs[0]
-        self.steps[i+1], self.steps[i] = self.steps[i], self.steps[i+1]
+        if i >= len(self.steps) - 1:
+            return
+
+        self.steps[i + 1], self.steps[i] = self.steps[i], self.steps[i + 1]
         self.refresh()
-        self.listbox.selection_set(i+1)
+
+        new_index = i + 1
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(new_index)
+        self.listbox.activate(new_index)
+        self.listbox.see(new_index)
+
+
+    def move_up_shortcut(self, event=None):
+        self.move_up()
+        return "break"
+
+
+    def move_down_shortcut(self, event=None):
+        self.move_down()
+        return "break"
 
     def on_select(self, _event=None):
         self.load_selected()
