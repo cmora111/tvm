@@ -654,7 +654,6 @@ class ChainBuilderWindow:
         Button(btns, text="Move Up", width=12, bg="#444444", fg="white", command=self.move_up).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Move Down", width=12, bg="#444444", fg="white", command=self.move_down).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
-        Button(btns, text="Apply to Editor", width=14, bg="navy", fg="white", command=self.apply_and_close).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Close", width=12, bg="red", fg="black", command=self.close).pack(side=RIGHT)
 
         self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
