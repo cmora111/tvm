@@ -546,7 +546,7 @@ class ChainBuilderWindow:
         self.result = None
         self.window = Toplevel(parent)
         self.window.title("Visual Chain Builder")
-        self.window.geometry("980x640")
+        self.window.geometry("1100x700")
         self.window.transient(parent)
         self.window.grab_set()
 
@@ -564,6 +564,27 @@ class ChainBuilderWindow:
             fg="black",
             relief="raised",
         ).pack(pady=(0, 8))
+
+        top_actions = Frame(outer)
+        top_actions.pack(fill=X, pady=(0, 8))
+
+        Button(
+            top_actions,
+            text="Apply to Editor",
+            width=18,
+            bg="navy",
+            fg="white",
+            command=self.apply_to_editor_now,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            top_actions,
+            text="Close",
+            width=12,
+            bg="red",
+            fg="black",
+            command=self.close,
+        ).pack(side=RIGHT)
 
         top = Frame(outer)
         top.pack(fill=BOTH, expand=True)
@@ -701,6 +722,10 @@ class ChainBuilderWindow:
 
         self.value_text.delete("1.0", END)
         self.value_text.focus_set()
+
+    def apply_to_editor_now(self):
+        self.result = list(self.steps)
+        self.window.destroy()
 
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
