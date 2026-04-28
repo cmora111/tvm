@@ -1328,6 +1328,10 @@ class CommandPaletteWindow:
         self.window.bind("<Control-D>", self.duplicate_selected)
         self.listbox.bind("<Control-d>", self.duplicate_selected)
         self.listbox.bind("<Control-D>", self.duplicate_selected)
+        self.window.bind("<Control-f>", self.toggle_favorite_selected)
+        self.window.bind("<Control-F>", self.toggle_favorite_selected)
+        self.listbox.bind("<Control-f>", self.toggle_favorite_selected)
+        self.listbox.bind("<Control-F>", self.toggle_favorite_selected)
         self.window.bind("<Delete>", self.delete_selected)
         self.listbox.bind("<Delete>", self.delete_selected)
 
@@ -1605,6 +1609,27 @@ class CommandPaletteWindow:
 
         return self.list_rows[index]
 
+    def toggle_favorite_selected(self, event=None):
+        item = self.selected_item()
+
+        if not item:
+            return "break"
+
+        category = item["category"]
+        name = item["name"]
+
+        if item.get("favorite"):
+            self.app.remove_favorite(category, name)
+            self.app.set_status(f"Removed favorite {category}/{name}")
+        else:
+            self.app.add_favorite(category, name)
+            self.app.set_status(f"Added favorite {category}/{name}")
+
+        self.app.rebuild_favorites_bar()
+        self.refresh()
+
+        return "break"
+
     def focus_listbox(self, _event=None):
         if self.listbox.size() > 0:
             self.listbox.focus_set()
@@ -1628,6 +1653,7 @@ class CommandPaletteWindow:
             "  Enter      -> Run command",
             "  Ctrl+E     -> Edit command",
             "  Ctrl+D     -> Duplicate command",
+            "  Ctrl+F     -> Toggle favorite",
             "  Delete     -> Delete command",
             "  Escape     -> Close palette",
         ]
