@@ -613,12 +613,21 @@ class ChainBuilderWindow:
             "  value=[\"path\", \"host\"]\n\n"
             "  kind=send\n"
             "  value=cd <path>\n"
+            "  Ctrl+I = Insert Before\n"
         )
         help_box.config(state="disabled")
 
         btns = Frame(outer)
         btns.pack(fill=X, pady=(10, 0))
         Button(btns, text="Add / Update Step", width=16, bg="darkgreen", fg="white", command=self.add_or_update_step).pack(side=LEFT, padx=(0, 6))
+        Button(
+            btns,
+            text="Insert Before",
+            width=14,
+            bg="#2f5597",
+            fg="white",
+            command=self.insert_step_before,
+        ).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Duplicate Step", width=14, bg="#555555", fg="white", command=self.duplicate_step).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Delete Step", width=14, bg="#7f6000", fg="white", command=self.delete_step).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Move Up", width=12, bg="#444444", fg="white", command=self.move_up).pack(side=LEFT, padx=(0, 6))
@@ -627,6 +636,7 @@ class ChainBuilderWindow:
         Button(btns, text="Apply to Editor", width=14, bg="navy", fg="white", command=self.apply_and_close).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Close", width=12, bg="red", fg="black", command=self.close).pack(side=RIGHT)
 
+        self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -666,6 +676,31 @@ class ChainBuilderWindow:
         self.listbox.delete(0, END)
         for step in self.steps:
             self.listbox.insert(END, self.step_to_label(step))
+
+    def insert_step_before(self):
+        try:
+            step = self.parse_current_step()
+        except Exception as exc:
+            messagebox.showerror("Chain Builder", str(exc))
+            return
+
+        idxs = self.listbox.curselection()
+
+        if idxs:
+            insert_index = idxs[0]
+        else:
+            insert_index = len(self.steps)
+
+        self.steps.insert(insert_index, step)
+        self.refresh()
+
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(insert_index)
+        self.listbox.activate(insert_index)
+        self.listbox.see(insert_index)
+
+        self.value_text.delete("1.0", END)
+        self.value_text.focus_set()
 
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
