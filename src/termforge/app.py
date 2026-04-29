@@ -661,9 +661,21 @@ class ChainBuilderWindow:
             fg="white",
             command=self.validate_chain_with_notice,
         ).pack(side=LEFT, padx=(0, 6))
+        Button(
+            btns,
+            text="Run Selected Step",
+            width=16,
+            bg="#2f5597",
+            fg="white",
+            command=self.run_selected_step,
+        ).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
 
         self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
+        self.window.bind("<Control-r>", self.run_selected_step_shortcut)
+        self.window.bind("<Control-R>", self.run_selected_step_shortcut)
+        self.listbox.bind("<Control-r>", self.run_selected_step_shortcut)
+        self.listbox.bind("<Control-R>", self.run_selected_step_shortcut)
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -800,6 +812,39 @@ class ChainBuilderWindow:
 
         messagebox.showinfo("Validate Chain", "Chain looks valid.")
         return True
+
+def get_selected_step_index(self):
+    idxs = self.listbox.curselection()
+    if not idxs:
+        return None
+    return idxs[0]
+
+
+    def run_selected_step(self):
+        index = self.get_selected_step_index()
+
+        if index is None:
+            messagebox.showerror("Run Selected Step", "Select a step first.")
+            return
+
+        if index < 0 or index >= len(self.steps):
+            return
+
+        step = self.steps[index]
+
+        try:
+            self.app.run_chain_step(step)
+            self.app.set_status(f"Ran chain step #{index + 1}")
+        except Exception as exc:
+            messagebox.showerror(
+                "Run Selected Step",
+                f"Could not run selected step:\n\n{exc}"
+            )
+
+
+    def run_selected_step_shortcut(self, event=None):
+        self.run_selected_step()
+        return "break"
 
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
@@ -2043,6 +2088,35 @@ class TermForgeApp:
         self.window_id = window_id
         self.last_window_id = window_id
         self.save_state()
+
+    def run_chain_step(self, step):
+        if not isinstance(step, (list, tuple)) or not step:
+            raise ValueError("Invalid chain step.")
+
+        kind = step[0]
+
+        if kind == "sleep":
+            import time
+            time.sleep(float(step[1]))
+            return
+
+        if kind == "select_profile":
+            self.select_profile(step[1])
+            return
+
+        if kind == "vars":
+            return
+
+        if len(step) == 2:
+            cmd_type = step[0]
+            cmd = step[1]
+            options = {}
+        else:
+            cmd_type = step[0]
+            cmd = step[1]
+            options = step[2] if len(step) > 2 else {}
+
+        self.run_cmd(cmd_type, cmd, options, None)
 
     def get_favorites(self) -> list[tuple[str, str]]:
         favs = []
