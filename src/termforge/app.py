@@ -636,6 +636,8 @@ class ChainBuilderWindow:
             "  kind=send\n"
             "  value=cd <path>\n"
             "  Ctrl+I = Insert Before\n"
+            "  Ctrl+R = Run Selected Step\n"
+            "  Ctrl+Shift+R = Run To End"
         )
         help_box.config(state="disabled")
 
@@ -670,6 +672,14 @@ class ChainBuilderWindow:
             fg="white",
             command=self.run_selected_step,
         ).pack(side=LEFT, padx=(0, 6))
+        Button(
+            btns,
+            text="Run To End",
+            width=14,
+            bg="#3d6d3d",
+            fg="white",
+            command=self.run_from_selected_to_end,
+        ).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
 
         self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
@@ -677,6 +687,8 @@ class ChainBuilderWindow:
         self.window.bind("<Control-R>", self.run_selected_step_shortcut)
         self.listbox.bind("<Control-r>", self.run_selected_step_shortcut)
         self.listbox.bind("<Control-R>", self.run_selected_step_shortcut)
+        self.window.bind("<Control-Shift-R>", self.run_from_selected_to_end_shortcut)
+        self.listbox.bind("<Control-Shift-R>", self.run_from_selected_to_end_shortcut)
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -845,6 +857,39 @@ class ChainBuilderWindow:
 
     def run_selected_step_shortcut(self, event=None):
         self.run_selected_step()
+        return "break"
+
+    def run_from_selected_to_end(self):
+        index = self.get_selected_step_index()
+
+        if index is None:
+            messagebox.showerror("Run To End", "Select a step first.")
+            return
+
+        if index < 0 or index >= len(self.steps):
+            return
+
+        failures = []
+
+        for i in range(index, len(self.steps)):
+            step = self.steps[i]
+
+            try:
+                self.app.run_chain_step(step)
+                self.app.set_status(f"Ran chain step #{i + 1}")
+            except Exception as exc:
+                failures.append(f"Step {i + 1}: {exc}")
+                break
+
+        if failures:
+            messagebox.showerror(
+                "Run To End",
+                "\n".join(failures)
+            )
+
+
+    def run_from_selected_to_end_shortcut(self, event=None):
+        self.run_from_selected_to_end()
         return "break"
 
     def parse_current_step(self):
