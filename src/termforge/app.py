@@ -541,8 +541,9 @@ class PluginManagerWindow:
 class ChainBuilderWindow:
     STEP_KINDS = ["vars", "select_profile", "sleep", "send", "spawn", "detached"]
 
-    def __init__(self, parent, initial_steps=None):
+    def __init__(self, parent, app, initial_steps=None):
         self.parent = parent
+        self.app = app
         self.result = None
         self.window = Toplevel(parent)
         self.window.title("Visual Chain Builder")
@@ -813,11 +814,11 @@ class ChainBuilderWindow:
         messagebox.showinfo("Validate Chain", "Chain looks valid.")
         return True
 
-def get_selected_step_index(self):
-    idxs = self.listbox.curselection()
-    if not idxs:
-        return None
-    return idxs[0]
+    def get_selected_step_index(self):
+        idxs = self.listbox.curselection()
+        if not idxs:
+            return None
+        return idxs[0]
 
 
     def run_selected_step(self):
@@ -1155,7 +1156,7 @@ class CommandEditorWindow:
                 initial = json.loads(current)
             except Exception:
                 initial = []
-        builder = ChainBuilderWindow(self.window, initial_steps=initial)
+        builder = ChainBuilderWindow(self.window, self.app, initial_steps=initial)
         result = builder.show()
         if result is not None:
             self.command_text.delete("1.0", END)
