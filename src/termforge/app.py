@@ -744,6 +744,63 @@ class ChainBuilderWindow:
 
         self.window.destroy()
 
+    def validate_chain(self) -> list[str]:
+        errors = []
+
+        if not self.steps:
+            errors.append("Chain has no steps.")
+            return errors
+
+        for index, step in enumerate(self.steps, start=1):
+            if not isinstance(step, (list, tuple)) or not step:
+                errors.append(f"Step {index}: invalid step format.")
+                continue
+
+            kind = step[0]
+
+            if kind == "vars":
+                if len(step) < 2 or not isinstance(step[1], list):
+                    errors.append(f"Step {index}: vars step must be ['vars', ['name1', 'name2']].")
+                else:
+                    for var_name in step[1]:
+                        if not isinstance(var_name, str) or not var_name.strip():
+                            errors.append(f"Step {index}: vars contains an invalid variable name.")
+
+            elif kind == "select_profile":
+                if len(step) < 2 or not str(step[1]).strip():
+                    errors.append(f"Step {index}: select_profile requires a profile name.")
+
+            elif kind == "sleep":
+                if len(step) < 2:
+                    errors.append(f"Step {index}: sleep requires seconds.")
+                else:
+                    try:
+                        seconds = float(step[1])
+                        if seconds < 0:
+                            errors.append(f"Step {index}: sleep seconds cannot be negative.")
+                    except Exception:
+                        errors.append(f"Step {index}: sleep value must be a number.")
+
+            elif kind in (1, 2, 3, "spawn", "send", "detached"):
+                if len(step) < 2 or not str(step[1]).strip():
+                    errors.append(f"Step {index}: command step requires command text.")
+
+            else:
+                errors.append(f"Step {index}: unknown step kind {kind!r}.")
+
+        return errors
+
+
+    def validate_chain_with_notice(self):
+        errors = self.validate_chain()
+
+        if errors:
+            messagebox.showerror("Validate Chain", "\n".join(errors))
+            return False
+
+        messagebox.showinfo("Validate Chain", "Chain looks valid.")
+        return True
+
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
         value = self.value_text.get("1.0", END).strip()
