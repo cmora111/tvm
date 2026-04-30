@@ -10,6 +10,7 @@ import sys
 import time
 import copy
 import traceback
+import shutil
 from datetime import datetime
 
 try:
@@ -37,6 +38,7 @@ from tkinter import (
     Tk,
     Toplevel,
     messagebox,
+    filedialog,
 )
 
 APP_NAME = "TermForge"
@@ -3180,6 +3182,86 @@ class TermForgeApp:
         except Exception as exc:
             self.log(f"Could not persist categories: {exc}")
 
+    def export_config_backup(self) -> None:
+        try:
+            if not CONFIG_FILE.exists():
+                messagebox.showerror("Export Config", "Config file does not exist yet.")
+                return
+
+            target = filedialog.asksaveasfilename(
+                title="Export TermForge Config Backup",
+                defaultextension=".py",
+                initialfile="termforge_config_backup.py",
+                filetypes=[
+                    ("Python config", "*.py"),
+                    ("All files", "*.*"),
+                ],
+            )
+
+            if not target:
+                return
+
+            shutil.copy2(CONFIG_FILE, target)
+            self.set_status(f"Exported config backup to {target}")
+            messagebox.showinfo("Export Config", f"Config exported to:\n\n{target}")
+
+        except Exception as exc:
+            messagebox.showerror("Export Config", str(exc))
+
+
+    def import_config_backup(self) -> None:
+        try:
+            source = filedialog.askopenfilename(
+                title="Import TermForge Config Backup",
+                filetypes=[
+                    ("Python config", "*.py"),
+                    ("All files", "*.*"),
+                ],
+            )
+
+            if not source:
+                return
+
+            if not messagebox.askokcancel(
+                "Import Config",
+                "Importing a backup will replace your current TermForge config.\n\nContinue?"
+            ):
+                return
+
+            # Validate before replacing current config.
+            spec = importlib.util.spec_from_file_location("termforge_import_test", source)
+            if spec is None or spec.loader is None:
+                messagebox.showerror("Import Config", "Could not read selected config file.")
+                return
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            if not hasattr(module, "Categories"):
+                messagebox.showerror("Import Config", "Selected file does not contain Categories.")
+                return
+
+            backup_current = CONFIG_FILE.with_suffix(".py.before_import")
+            if CONFIG_FILE.exists():
+                shutil.copy2(CONFIG_FILE, backup_current)
+
+            shutil.copy2(source, CONFIG_FILE)
+
+            self.cfg = load_config()
+            self.rebuild_category_buttons()
+            self.rebuild_favorites_bar()
+            self.initialize_hotkeys()
+            self.load_plugins(force=True)
+
+            self.set_status("Imported config backup.")
+            messagebox.showinfo(
+                "Import Config",
+                f"Config imported successfully.\n\nPrevious config backup:\n{backup_current}"
+            )
+
+        except Exception as exc:
+            messagebox.showerror("Import Config", str(exc))
+
     def reload_from_config_with_notice(self, silent: bool = False) -> None:
         try:
             self.cfg = load_config()
@@ -3345,6 +3427,10 @@ class TermForgeApp:
         menubar = Menu(self.root)
 
         file_menu = Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Export Config Backup", command=self.export_config_backup)
+        file_menu.add_command(label="Import Config Backup", command=self.import_config_backup)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_close)
         file_menu.add_command(label="Exit", command=self.on_close)
         menubar.add_cascade(label="File", menu=file_menu)
 
