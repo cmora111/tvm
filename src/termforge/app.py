@@ -682,6 +682,10 @@ class ChainBuilderWindow:
         ).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
 
+        self.drag_index = None
+
+        self.listbox.bind("<Button-1>", self.on_drag_start)
+        self.listbox.bind("<B1-Motion>", self.on_drag_motion)
         self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
         self.window.bind("<Control-r>", self.run_selected_step_shortcut)
         self.window.bind("<Control-R>", self.run_selected_step_shortcut)
@@ -745,6 +749,37 @@ class ChainBuilderWindow:
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.window.config(menu=menubar)
+
+    def on_drag_start(self, event):
+        index = self.listbox.nearest(event.y)
+        if index >= 0:
+            self.drag_index = index
+
+
+    def on_drag_motion(self, event):
+        if self.drag_index is None:
+            return
+
+        new_index = self.listbox.nearest(event.y)
+
+        if new_index == self.drag_index:
+            return
+
+        if new_index < 0 or new_index >= len(self.steps):
+            return
+
+        # move step
+        step = self.steps.pop(self.drag_index)
+        self.steps.insert(new_index, step)
+
+        self.refresh()
+
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(new_index)
+        self.listbox.activate(new_index)
+        self.listbox.see(new_index)
+
+        self.drag_index = new_index
 
     def show_chain_builder_shortcuts(self):
         messagebox.showinfo(
