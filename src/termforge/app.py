@@ -552,6 +552,7 @@ class ChainBuilderWindow:
         self.window.geometry("1100x700")
         self.window.transient(parent)
         self.window.grab_set()
+        self.build_menu()
 
         self.steps = list(initial_steps or [])
 
@@ -655,10 +656,6 @@ class ChainBuilderWindow:
             fg="white",
             command=self.insert_step_before,
         ).pack(side=LEFT, padx=(0, 6))
-        Button(btns, text="Duplicate Step", width=14, bg="#555555", fg="white", command=self.duplicate_step).pack(side=LEFT, padx=(0, 6))
-        Button(btns, text="Delete Step", width=14, bg="#7f6000", fg="white", command=self.delete_step).pack(side=LEFT, padx=(0, 6))
-        Button(btns, text="Move Up", width=12, bg="#444444", fg="white", command=self.move_up).pack(side=LEFT, padx=(0, 6))
-        Button(btns, text="Move Down", width=12, bg="#444444", fg="white", command=self.move_down).pack(side=LEFT, padx=(0, 6))
         Button(
             btns,
             text="Validate Chain",
@@ -674,14 +671,6 @@ class ChainBuilderWindow:
             bg="#2f5597",
             fg="white",
             command=self.run_selected_step,
-        ).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Run To End",
-            width=14,
-            bg="#3d6d3d",
-            fg="white",
-            command=self.run_from_selected_to_end,
         ).pack(side=LEFT, padx=(0, 6))
         Button(
             btns,
@@ -730,6 +719,49 @@ class ChainBuilderWindow:
         else:
             self.value_label.config(text="Value:")
             self.hint_var.set("")
+
+    def build_menu(self):
+        menubar = Menu(self.window)
+
+        edit_menu = Menu(menubar, tearoff=0)
+        edit_menu.add_command(label="Insert Before\tCtrl+I", command=self.insert_step_before)
+        edit_menu.add_command(label="Duplicate Step\tCtrl+D", command=self.duplicate_step)
+        edit_menu.add_command(label="Delete Step\tDelete", command=self.delete_step)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Move Up\tAlt+Up", command=self.move_up)
+        edit_menu.add_command(label="Move Down\tAlt+Down", command=self.move_down)
+        menubar.add_cascade(label="Edit", menu=edit_menu)
+
+        run_menu = Menu(menubar, tearoff=0)
+        run_menu.add_command(label="Run Selected Step\tCtrl+R", command=self.run_selected_step)
+        run_menu.add_command(label="Run To End\tCtrl+Shift+R", command=self.run_from_selected_to_end)
+        run_menu.add_separator()
+        run_menu.add_command(label="Validate Chain", command=self.validate_chain_with_notice)
+        run_menu.add_command(label="Dry Run\tCtrl+Shift+D", command=self.show_dry_run_preview)
+        menubar.add_cascade(label="Run", menu=run_menu)
+
+        help_menu = Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Shortcuts", command=self.show_chain_builder_shortcuts)
+        menubar.add_cascade(label="Help", menu=help_menu)
+
+        self.window.config(menu=menubar)
+
+    def show_chain_builder_shortcuts(self):
+        messagebox.showinfo(
+            "Chain Builder Shortcuts",
+            "\n".join([
+                "Chain Builder Shortcuts",
+                "",
+                "Ctrl+I        Insert step before selected",
+                "Ctrl+D        Duplicate selected step",
+                "Delete        Delete selected step",
+                "Alt+Up        Move selected step up",
+                "Alt+Down      Move selected step down",
+                "Ctrl+R        Run selected step",
+                "Ctrl+Shift+R  Run selected step to end",
+                "Ctrl+Shift+D  Dry run preview",
+            ])
+        )
 
     def step_to_label(self, step):
         if isinstance(step, (list, tuple)) and step:
