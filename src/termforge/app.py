@@ -637,7 +637,8 @@ class ChainBuilderWindow:
             "  value=cd <path>\n"
             "  Ctrl+I = Insert Before\n"
             "  Ctrl+R = Run Selected Step\n"
-            "  Ctrl+Shift+R = Run To End"
+            "  Ctrl+Shift+R = Run To End\n"
+            "  Ctrl+Shift+D = Dry Run Preview\n"
         )
         help_box.config(state="disabled")
 
@@ -680,6 +681,14 @@ class ChainBuilderWindow:
             fg="white",
             command=self.run_from_selected_to_end,
         ).pack(side=LEFT, padx=(0, 6))
+        Button(
+            btns,
+            text="Dry Run",
+            width=12,
+            bg="#555577",
+            fg="white",
+            command=self.show_dry_run_preview,
+        ).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
 
         self.window.bind("<Control-i>", lambda _e: self.insert_step_before())
@@ -689,6 +698,8 @@ class ChainBuilderWindow:
         self.listbox.bind("<Control-R>", self.run_selected_step_shortcut)
         self.window.bind("<Control-Shift-R>", self.run_from_selected_to_end_shortcut)
         self.listbox.bind("<Control-Shift-R>", self.run_from_selected_to_end_shortcut)
+        self.window.bind("<Control-Shift-D>", lambda _e: self.show_dry_run_preview())
+        self.listbox.bind("<Control-Shift-D>", lambda _e: self.show_dry_run_preview())
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -891,6 +902,59 @@ class ChainBuilderWindow:
     def run_from_selected_to_end_shortcut(self, event=None):
         self.run_from_selected_to_end()
         return "break"
+
+    def dry_run_lines(self) -> list[str]:
+        lines = ["Dry Run Preview", ""]
+
+        if not self.steps:
+            lines.append("Chain has no steps.")
+            return lines
+
+        for index, step in enumerate(self.steps, start=1):
+            if not isinstance(step, (list, tuple)) or not step:
+                lines.append(f"{index}. INVALID STEP: {step!r}")
+                continue
+
+            kind = step[0]
+
+            if kind == "vars":
+                values = step[1] if len(step) > 1 else []
+                lines.append(f"{index}. prompt vars -> {', '.join(map(str, values)) if values else '(none)'}")
+
+            elif kind == "select_profile":
+                profile = step[1] if len(step) > 1 else ""
+                lines.append(f"{index}. select profile -> {profile or '(missing)'}")
+
+            elif kind == "sleep":
+                seconds = step[1] if len(step) > 1 else ""
+                lines.append(f"{index}. sleep -> {seconds} second(s)")
+
+            elif kind in (1, "spawn"):
+                command = step[1] if len(step) > 1 else ""
+                lines.append(f"{index}. spawn terminal -> {command or '(missing command)'}")
+
+            elif kind in (2, "send"):
+                command = step[1] if len(step) > 1 else ""
+                lines.append(f"{index}. send to selected window -> {command or '(missing command)'}")
+
+            elif kind in (3, "detached"):
+                command = step[1] if len(step) > 1 else ""
+                lines.append(f"{index}. detached/background -> {command or '(missing command)'}")
+
+            else:
+                lines.append(f"{index}. UNKNOWN kind={kind!r} step={step!r}")
+
+            if len(step) > 2 and isinstance(step[2], dict) and step[2]:
+                lines.append(f"   options -> {step[2]}")
+
+        return lines
+
+
+    def show_dry_run_preview(self):
+        messagebox.showinfo(
+            "Dry Run Preview",
+            "\n".join(self.dry_run_lines())
+        )
 
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
