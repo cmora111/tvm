@@ -642,6 +642,7 @@ class ChainBuilderWindow:
             "  Ctrl+R = Run Selected Step\n"
             "  Ctrl+Shift+R = Run To End\n"
             "  Ctrl+Shift+D = Dry Run Preview\n"
+            "  Ctrl+Alt+d   = Dry Run Preview with Value\n"
         )
         help_box.config(state="disabled")
 
@@ -680,6 +681,14 @@ class ChainBuilderWindow:
             fg="white",
             command=self.show_dry_run_preview,
         ).pack(side=LEFT, padx=(0, 6))
+        Button(
+            btns,
+            text="Dry Run + Vars",
+            width=14,
+            bg="#555577",
+            fg="white",
+            command=self.show_dry_run_preview_with_values,
+        ).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
 
         self.drag_index = None
@@ -695,6 +704,8 @@ class ChainBuilderWindow:
         self.listbox.bind("<Control-Shift-R>", self.run_from_selected_to_end_shortcut)
         self.window.bind("<Control-Shift-D>", lambda _e: self.show_dry_run_preview())
         self.listbox.bind("<Control-Shift-D>", lambda _e: self.show_dry_run_preview())
+        self.window.bind("<Control-Alt-d>", lambda _e: self.show_dry_run_preview_with_values())
+        self.listbox.bind("<Control-Alt-d>", lambda _e: self.show_dry_run_preview_with_values())
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -972,12 +983,43 @@ class ChainBuilderWindow:
         self.run_from_selected_to_end()
         return "break"
 
-    def dry_run_lines(self) -> list[str]:
+    def dry_run_lines(self, substitute_vars: bool = False) -> list[str]:
         lines = ["Dry Run Preview", ""]
 
         if not self.steps:
             lines.append("Chain has no steps.")
             return lines
+
+        values = {}
+
+        if substitute_vars:
+            var_names = []
+            for step in self.steps:
+                if (
+                    isinstance(step, (list, tuple))
+                    and len(step) >= 2
+                    and step[0] == "vars"
+                    and isinstance(step[1], list)
+                ):
+                    for name in step[1]:
+                        if isinstance(name, str) and name not in var_names:
+                            var_names.append(name)
+
+            if var_names:
+                prompt = MultiFieldPrompt(
+                    self.window,
+                    "Dry Run Variables",
+                    var_names,
+                    heading="Enter preview values",
+                )
+                values = prompt.show() or {}
+
+        def substitute(text: str) -> str:
+            if not substitute_vars:
+                return text
+            for key, value in values.items():
+                text = text.replace(f"<{key}>", value)
+            return text
 
         for index, step in enumerate(self.steps, start=1):
             if not isinstance(step, (list, tuple)) or not step:
@@ -987,8 +1029,10 @@ class ChainBuilderWindow:
             kind = step[0]
 
             if kind == "vars":
-                values = step[1] if len(step) > 1 else []
-                lines.append(f"{index}. prompt vars -> {', '.join(map(str, values)) if values else '(none)'}")
+                names = step[1] if len(step) > 1 and isinstance(step[1], list) else []
+                lines.append(
+                    f"{index}. prompt vars -> {', '.join(map(str, names)) if names else '(none)'}"
+                )
 
             elif kind == "select_profile":
                 profile = step[1] if len(step) > 1 else ""
@@ -999,15 +1043,15 @@ class ChainBuilderWindow:
                 lines.append(f"{index}. sleep -> {seconds} second(s)")
 
             elif kind in (1, "spawn"):
-                command = step[1] if len(step) > 1 else ""
+                command = substitute(str(step[1])) if len(step) > 1 else ""
                 lines.append(f"{index}. spawn terminal -> {command or '(missing command)'}")
 
             elif kind in (2, "send"):
-                command = step[1] if len(step) > 1 else ""
+                command = substitute(str(step[1])) if len(step) > 1 else ""
                 lines.append(f"{index}. send to selected window -> {command or '(missing command)'}")
 
             elif kind in (3, "detached"):
-                command = step[1] if len(step) > 1 else ""
+                command = substitute(str(step[1])) if len(step) > 1 else ""
                 lines.append(f"{index}. detached/background -> {command or '(missing command)'}")
 
             else:
@@ -1018,12 +1062,13 @@ class ChainBuilderWindow:
 
         return lines
 
-
     def show_dry_run_preview(self):
-        messagebox.showinfo(
-            "Dry Run Preview",
-            "\n".join(self.dry_run_lines())
-        )
+        lines = self.dry_run_lines(substitute_vars=False)
+        messagebox.showinfo("Dry Run Preview", "\n".join(lines))
+
+    def show_dry_run_preview_with_values(self):
+        lines = self.dry_run_lines(substitute_vars=True)
+        messagebox.showinfo("Dry Run Preview With Values", "\n".join(lines))
 
     def parse_current_step(self):
         kind = self.kind_var.get().strip().lower()
