@@ -96,6 +96,7 @@ def ensure_user_config() -> None:
         "Hotkeys = {}",
         "DisabledPlugins = []",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
+        "ChainTemplates = {}",
         "",
     ]
     CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
@@ -583,6 +584,15 @@ class ChainBuilderWindow:
 
         Button(
             top_actions,
+            text="Templates",
+            width=14,
+            bg="#555577",
+            fg="white",
+            command=self.manage_chain_templates,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            top_actions,
             text="Close",
             width=12,
             bg="red",
@@ -747,6 +757,14 @@ class ChainBuilderWindow:
         edit_menu.add_command(label="Move Down\tAlt+Down", command=self.move_down)
         menubar.add_cascade(label="Edit", menu=edit_menu)
 
+        templates_menu = Menu(menubar, tearoff=0)
+        templates_menu.add_command(label="Save Current Chain as Template", command=self.save_steps_as_template)
+        templates_menu.add_command(label="Insert Template Before Selected", command=self.insert_template_before_selected)
+        templates_menu.add_command(label="Append Template", command=self.append_template)
+        templates_menu.add_separator()
+        templates_menu.add_command(label="List Templates", command=self.manage_chain_templates)
+        menubar.add_cascade(label="Templates", menu=templates_menu)
+
         run_menu = Menu(menubar, tearoff=0)
         run_menu.add_command(label="Run Selected Step\tCtrl+R", command=self.run_selected_step)
         run_menu.add_command(label="Run To End\tCtrl+Shift+R", command=self.run_from_selected_to_end)
@@ -814,6 +832,123 @@ class ChainBuilderWindow:
             kind = step[0]
             return f"{kind}: {step!r}"
         return repr(step)
+
+    def save_steps_as_template(self):
+        if not self.steps:
+            messagebox.showerror("Chain Templates", "There are no steps to save.")
+            return
+
+        prompt = MultiFieldPrompt(
+            self.window,
+            "Save Chain Template",
+            ["template_name"],
+            heading="Enter template name",
+        )
+
+        values = prompt.show()
+        if values is None:
+            return
+
+        name = values.get("template_name", "").strip()
+        if not name:
+            messagebox.showerror("Chain Templates", "Template name is required.")
+            return
+
+        templates = self.app.get_chain_templates()
+
+        if name in templates:
+            if not messagebox.askokcancel(
+                "Overwrite Template",
+                f"Template '{name}' already exists.\n\nOverwrite it?"
+            ):
+                return
+
+        templates[name] = copy.deepcopy(self.steps)
+        self.app.persist_chain_templates()
+        self.app.set_status(f"Saved chain template {name}")
+        messagebox.showinfo("Chain Templates", f"Saved template:\n\n{name}")
+
+
+    def choose_chain_template(self):
+        templates = self.app.get_chain_templates()
+        if not templates:
+            messagebox.showerror("Chain Templates", "No chain templates have been saved yet.")
+            return None
+
+        names = sorted(templates.keys())
+
+        prompt = MultiFieldPrompt(
+            self.window,
+            "Choose Chain Template",
+            ["template_name"],
+            defaults={"template_name": names[0]},
+            heading="Enter template name",
+        )
+
+        values = prompt.show()
+        if values is None:
+            return None
+
+        name = values.get("template_name", "").strip()
+        if name not in templates:
+            available = "\n".join(names)
+            messagebox.showerror(
+                "Chain Templates",
+                f"Unknown template: {name}\n\nAvailable templates:\n{available}"
+            )
+            return None
+
+        return copy.deepcopy(templates[name])
+
+
+    def insert_template_before_selected(self):
+        steps = self.choose_chain_template()
+        if steps is None:
+            return
+
+        idxs = self.listbox.curselection()
+        insert_index = idxs[0] if idxs else len(self.steps)
+
+        for offset, step in enumerate(steps):
+            self.steps.insert(insert_index + offset, step)
+
+        self.refresh()
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(insert_index)
+        self.listbox.activate(insert_index)
+        self.listbox.see(insert_index)
+
+
+    def append_template(self):
+        steps = self.choose_chain_template()
+        if steps is None:
+            return
+
+        start = len(self.steps)
+        self.steps.extend(steps)
+
+        self.refresh()
+        if self.steps:
+            self.listbox.selection_clear(0, END)
+            self.listbox.selection_set(start)
+            self.listbox.activate(start)
+            self.listbox.see(start)
+
+
+    def manage_chain_templates(self):
+        templates = self.app.get_chain_templates()
+
+        if not templates:
+            messagebox.showinfo("Chain Templates", "No templates saved yet.")
+            return
+
+        lines = ["Saved Chain Templates", ""]
+
+        for name in sorted(templates.keys()):
+            steps = templates.get(name, [])
+            lines.append(f"{name}  ({len(steps)} step{'s' if len(steps) != 1 else ''})")
+
+        messagebox.showinfo("Chain Templates", "\n".join(lines))
 
     def refresh(self):
         self.listbox.delete(0, END)
@@ -2342,6 +2477,17 @@ class TermForgeApp:
 
         self.run_cmd(cmd_type, cmd, options, None)
 
+    def get_chain_templates(self) -> dict:
+        templates = getattr(self.cfg, "ChainTemplates", {})
+        if not isinstance(templates, dict):
+            templates = {}
+            setattr(self.cfg, "ChainTemplates", templates)
+        return templates
+
+
+    def persist_chain_templates(self) -> None:
+        self.persist_full_config()
+
     def get_favorites(self) -> list[tuple[str, str]]:
         favs = []
         raw = getattr(self.cfg, "Favorites", [])
@@ -3419,6 +3565,7 @@ class TermForgeApp:
             hotkeys = getattr(self.cfg, "Hotkeys", {})
             disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
             categories = getattr(self.cfg, "Categories", {})
+            chain_templates = getattr(self.cfg, "ChainTemplates", {})
 
             lines = [
                 "# TermForge user configuration",
@@ -3427,11 +3574,11 @@ class TermForgeApp:
                 f"terminal = {pprint.pformat(terminal, indent=4)}",
                 f"debug = {pprint.pformat(debug, indent=4)}",
                 f"Windows = {pprint.pformat(windows, indent=4)}",
-                f"Favorites = {pprint.pformat(favorites, indent=4)}",
                 f"Recent = {pprint.pformat(recent, indent=4)}",
                 f"Usage = {pprint.pformat(usage, indent=4)}",
                 f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
                 f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
+                f"ChainTemplates = {pprint.pformat(chain_templates, indent=4)}",
                 f"Categories = {pprint.pformat(categories, indent=4)}",
                 "",
             ]
