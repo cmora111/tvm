@@ -3026,6 +3026,53 @@ class TermForgeApp:
             resolved = resolved.replace(f"<{field_name}>", values.get(field_name, ""))
         return resolved
 
+    def collect_chain_vars(self, steps) -> list[str]:
+        names = []
+
+        def add_name(name):
+            name = str(name).strip()
+            if name and name not in names:
+                names.append(name)
+
+        for step in steps:
+            if not isinstance(step, (list, tuple)) or not step:
+                continue
+
+            # Explicit vars step: ["vars", ["path", "host"]]
+            if step[0] == "vars" and len(step) > 1 and isinstance(step[1], (list, tuple)):
+                for name in step[1]:
+                    add_name(name)
+
+            # Command placeholders: [2, "cd <path> && ssh <host>"]
+            try:
+                _cmd_type, cmd, _options = parse_command_entry(step)
+            except Exception:
+                continue
+
+            if isinstance(cmd, str):
+                for name in re.findall(r"<([^<>]+)>", cmd):
+                    add_name(name)
+
+        return names
+
+
+    def substitute_chain_vars(self, text: str, values: dict[str, str]) -> str:
+        for key, value in values.items():
+            text = text.replace(f"<{key}>", value)
+        return text
+
+
+    def substitute_step_vars(self, step, values: dict[str, str]):
+        if not isinstance(step, (list, tuple)):
+            return step
+
+        step = list(step)
+
+        if len(step) > 1 and isinstance(step[1], str):
+            step[1] = self.substitute_chain_vars(step[1], values)
+
+        return step
+
     def resolve_shared_vars(self, names: list[str]) -> dict[str, str] | None:
         prompt = MultiFieldPrompt(
             self.root,
@@ -3102,6 +3149,16 @@ class TermForgeApp:
 
         total = len(steps)
         shared_vars: dict[str, str] = {}
+
+        # Collect all declared vars once before execution.
+        var_names = self.collect_chain_vars(steps)
+        if var_names:
+            values = self.resolve_shared_vars(var_names)
+            if values is None:
+                self.set_status("Chain cancelled during shared vars.")
+                return
+            shared_vars.update(values)
+
         runner = ChainRunnerWindow(self.root, total)
 
         for index, step in enumerate(steps, start=1):
@@ -3110,18 +3167,14 @@ class TermForgeApp:
                 raise TermForgeError(f"Invalid chain step: {step!r}")
 
             step_kind = step[0]
+
             try:
                 if step_kind == "vars":
                     runner.step_running(index, total, "shared vars")
                     if len(step) < 2 or not isinstance(step[1], (list, tuple)):
                         raise TermForgeError("vars step requires a list of variable names.")
                     names = [str(name) for name in step[1]]
-                    values = self.resolve_shared_vars(names)
-                    if values is None:
-                        runner.step_failed("Chain cancelled during shared vars.")
-                        return
-                    shared_vars.update(values)
-                    runner.step_done(f"Shared vars captured: {', '.join(names)}")
+                    runner.step_done(f"Shared vars already captured: {', '.join(names)}")
                     continue
 
                 if step_kind == "sleep":
@@ -3141,12 +3194,18 @@ class TermForgeApp:
                     continue
 
                 step_type, step_cmd, step_options = parse_command_entry(step)
+
                 if isinstance(step_cmd, str):
-                    step_cmd = self.resolve_command_placeholders(step_cmd, shared_vars=shared_vars)
+                    step_cmd = self.resolve_command_placeholders(
+                        step_cmd,
+                        shared_vars=shared_vars,
+                    )
                     if step_cmd is None:
                         runner.step_failed("Chain cancelled.")
                         return
+
                 runner.step_running(index, total, str(step_cmd))
+
                 self.run_cmd(
                     step_type,
                     step_cmd,
@@ -3155,7 +3214,9 @@ class TermForgeApp:
                     record_history=False,
                     shared_vars=shared_vars,
                 )
+
                 runner.step_done(str(step_cmd))
+
             except Exception as exc:
                 runner.step_failed(str(exc))
                 raise
