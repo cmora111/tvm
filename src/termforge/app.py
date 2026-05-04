@@ -3029,14 +3029,29 @@ class TermForgeApp:
     def collect_chain_vars(self, steps) -> list[str]:
         names = []
 
+        def add_name(name):
+            name = str(name).strip()
+            if name and name not in names:
+                names.append(name)
+
         for step in steps:
             if not isinstance(step, (list, tuple)) or not step:
                 continue
 
-            if step[0] == "vars" and len(step) > 1 and isinstance(step[1], list):
+            # Explicit vars step: ["vars", ["path", "host"]]
+            if step[0] == "vars" and len(step) > 1 and isinstance(step[1], (list, tuple)):
                 for name in step[1]:
-                    if isinstance(name, str) and name not in names:
-                        names.append(name)
+                    add_name(name)
+
+            # Command placeholders: [2, "cd <path> && ssh <host>"]
+            try:
+                _cmd_type, cmd, _options = parse_command_entry(step)
+            except Exception:
+                continue
+
+            if isinstance(cmd, str):
+                for name in re.findall(r"<([^<>]+)>", cmd):
+                    add_name(name)
 
         return names
 
