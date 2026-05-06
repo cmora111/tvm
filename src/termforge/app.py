@@ -648,11 +648,13 @@ class ChainBuilderWindow:
             "  value=[\"path\", \"host\"]\n\n"
             "  kind=send\n"
             "  value=cd <path>\n"
-            "  Ctrl+I = Insert Before\n"
-            "  Ctrl+R = Run Selected Step\n"
+            "  Ctrl+I       = Insert Before\n"
+            "  Ctrl+R       = Run Selected Step\n"
             "  Ctrl+Shift+R = Run To End\n"
             "  Ctrl+Shift+D = Dry Run Preview\n"
             "  Ctrl+Alt+d   = Dry Run Preview with Value\n"
+            "  <home>       = Move to Top\n"
+            "  <end>        = Move to Bottom\n"
         )
         help_box.config(state="disabled")
 
@@ -716,6 +718,10 @@ class ChainBuilderWindow:
         self.listbox.bind("<Control-Shift-D>", lambda _e: self.show_dry_run_preview())
         self.window.bind("<Control-Alt-d>", lambda _e: self.show_dry_run_preview_with_values())
         self.listbox.bind("<Control-Alt-d>", lambda _e: self.show_dry_run_preview_with_values())
+        self.window.bind_all("<Home>", self.move_to_top_shortcut)
+        self.window.bind_all("<End>", self.move_to_bottom_shortcut)
+        self.listbox.bind("<Home>", self.move_to_top_shortcut)
+        self.listbox.bind("<End>", self.move_to_bottom_shortcut)
         self.kind_var.trace_add("write", self.update_kind_ui)
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
         self.update_kind_ui()
@@ -734,8 +740,6 @@ class ChainBuilderWindow:
             self.hint_var.set("Enter a number, e.g. 1 or 0.5")
         elif kind == "send":
             self.value_label.config(text="Command:")
-            self.hint_var.set("Plain text terminal command sent to selected window")
-        elif kind == "spawn":
             self.value_label.config(text="Command:")
             self.hint_var.set("Plain text command run in a new terminal")
         elif kind == "detached":
@@ -755,6 +759,9 @@ class ChainBuilderWindow:
         edit_menu.add_separator()
         edit_menu.add_command(label="Move Up\tAlt+Up", command=self.move_up)
         edit_menu.add_command(label="Move Down\tAlt+Down", command=self.move_down)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Move To Top\tHome", command=self.move_to_top)
+        edit_menu.add_command(label="Move To Bottom\tEnd", command=self.move_to_bottom)
         menubar.add_cascade(label="Edit", menu=edit_menu)
 
         templates_menu = Menu(menubar, tearoff=0)
@@ -778,6 +785,7 @@ class ChainBuilderWindow:
         menubar.add_cascade(label="Help", menu=help_menu)
 
         self.window.config(menu=menubar)
+
 
     def on_drag_start(self, event):
         index = self.listbox.nearest(event.y)
@@ -810,28 +818,84 @@ class ChainBuilderWindow:
 
         self.drag_index = new_index
 
-    def show_chain_builder_shortcuts(self):
-        messagebox.showinfo(
-            "Chain Builder Shortcuts",
-            "\n".join([
-                "Chain Builder Shortcuts",
-                "",
-                "Ctrl+I        Insert step before selected",
-                "Ctrl+D        Duplicate selected step",
-                "Delete        Delete selected step",
-                "Alt+Up        Move selected step up",
-                "Alt+Down      Move selected step down",
-                "Ctrl+R        Run selected step",
-                "Ctrl+Shift+R  Run selected step to end",
-                "Ctrl+Shift+D  Dry run preview",
-            ])
-        )
+    def get_selected_step_index(self):
+        idxs = self.listbox.curselection()
+        if idxs:
+            return idxs[0]
+
+        try:
+            active = self.listbox.index("active")
+            if 0 <= active < len(self.steps):
+                return active
+        except Exception:
+            pass
+
+        return None
+
+
+    def move_to_top(self):
+        i = self.get_selected_step_index()
+        if i is None or i <= 0:
+            return
+
+        step = self.steps.pop(i)
+        self.steps.insert(0, step)
+
+        self.refresh()
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(0)
+        self.listbox.activate(0)
+        self.listbox.see(0)
+
+
+    def move_to_bottom(self):
+        i = self.get_selected_step_index()
+        if i is None or i >= len(self.steps) - 1:
+            return
+
+        step = self.steps.pop(i)
+        self.steps.append(step)
+
+        new_index = len(self.steps) - 1
+
+        self.refresh()
+        self.listbox.selection_clear(0, END)
+        self.listbox.selection_set(new_index)
+        self.listbox.activate(new_index)
+        self.listbox.see(new_index)
+
+    def move_to_top_shortcut(self, event=None):
+        self.move_to_top()
+        return "break"
+
+    def move_to_bottom_shortcut(self, event=None):
+        self.move_to_bottom()
+        return "break"
 
     def step_to_label(self, step):
         if isinstance(step, (list, tuple)) and step:
             kind = step[0]
             return f"{kind}: {step!r}"
         return repr(step)
+
+    def show_chain_builder_shortcuts(self):
+        messagebox.showinfo(
+            "Chain Builder Shortcuts",
+            "\n".join([
+                "Chain Builder Shortcuts",
+                "",
+                "Ctrl+I         Insert step before selected",
+                "Ctrl+D         Duplicate selected step",
+                "Delete         Delete selected step",
+                "Alt+Up         Move selected step up",
+                "Alt+Down       Move selected step down",
+                "Home           Move selected step to top",
+                "End            Move selected step to bottom",
+                "Ctrl+R         Run selected step",
+                "Ctrl+Shift+R   Run selected step to end",
+                "Ctrl+Shift+D   Dry run preview",
+            ])
+        )
 
     def save_steps_as_template(self):
         if not self.steps:
@@ -1051,12 +1115,6 @@ class ChainBuilderWindow:
 
         messagebox.showinfo("Validate Chain", "Chain looks valid.")
         return True
-
-    def get_selected_step_index(self):
-        idxs = self.listbox.curselection()
-        if not idxs:
-            return None
-        return idxs[0]
 
 
     def run_selected_step(self):
@@ -1509,16 +1567,24 @@ class CommandEditorWindow:
     def open_chain_builder(self):
         current = self.command_text.get("1.0", END).strip()
         initial = []
+
         if current:
             try:
                 initial = json.loads(current)
-            except Exception:
-                initial = []
+            except Exception as exc:
+                messagebox.showerror(
+                    "Chain Builder",
+                    f"Could not parse current chain JSON:\n\n{exc}"
+                )
+                return
+
         builder = ChainBuilderWindow(self.window, self.app, initial_steps=initial)
         result = builder.show()
+
         if result is not None:
             self.command_text.delete("1.0", END)
             self.command_text.insert("1.0", json.dumps(result, indent=2))
+
 
     def refresh(self):
         self.snapshot.clear()
@@ -3610,6 +3676,8 @@ class TermForgeApp:
         CommandPaletteWindow(self)
         return "break"
 
+
+
     def bind_global_shortcuts(self) -> None:
         self.root.bind_all("<Control-p>", self.open_command_palette)
         self.root.bind_all("<Control-P>", self.open_command_palette)
@@ -3626,6 +3694,26 @@ class TermForgeApp:
             hotkeys = getattr(self.cfg, "Hotkeys", {})
             disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
             categories = getattr(self.cfg, "Categories", {})
+            chain_templates = getattr(self.cfg, "ChainTemplates", {})
+
+            lines = [
+                "# TermForge user configuration",
+                "# Edit Categories below.",
+                "",
+                f"terminal = {pprint.pformat(terminal, indent=4)}",
+                f"debug = {pprint.pformat(debug, indent=4)}",
+                f"Windows = {pprint.pformat(windows, indent=4)}",
+                f"Recent = {pprint.pformat(recent, indent=4)}",
+                f"Usage = {pprint.pformat(usage, indent=4)}",
+                f"Hotkeys = {pprint.pformat(hotkeys, indent=4)}",
+                f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
+                f"ChainTemplates = {pprint.pformat(chain_templates, indent=4)}",
+                f"Categories = {pprint.pformat(categories, indent=4)}",
+                "",
+            ]
+
+            CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
+        except Exception as exc:
             chain_templates = getattr(self.cfg, "ChainTemplates", {})
 
             lines = [
@@ -3794,6 +3882,9 @@ class TermForgeApp:
 
         frame = Frame(self.root, padx=8, pady=8)
         frame.pack()
+        self.categories_frame = Frame(frame)
+        self.categories_frame.pack()
+        self.category_buttons = {}
 
         Label(
             frame,
@@ -3809,26 +3900,6 @@ class TermForgeApp:
         if favorites:
             Label(frame, text="Favorites", width=28, bg="#d9edf7", fg="black", relief="groove").pack(pady=(0, 4))
             self.favorites_frame = Frame(frame)
-            self.favorites_frame.pack(fill=X, pady=(0, 8))
-            self.rebuild_favorites_bar()
-        else:
-            self.favorites_frame = Frame(frame)
-            self.favorites_frame.pack(fill=X, pady=(0, 8))
-
-        search_row = Frame(frame)
-        search_row.pack(fill=X, pady=(0, 8))
-        Label(search_row, text="Search:", width=8, anchor="w").pack(side=LEFT)
-        search_entry = Entry(search_row, textvariable=self.search_var, width=22)
-        search_entry.pack(side=LEFT, fill=X, expand=True)
-        Button(search_row, text="Go", width=6, command=self.open_search_results, bg="navy", fg="white").pack(side=LEFT, padx=(6, 0))
-        Button(search_row, text="Clear", width=6, command=self.clear_search, bg="gray", fg="white").pack(side=LEFT, padx=(6, 0))
-        self.search_var.trace_add("write", self.update_category_filter)
-        search_entry.bind("<Return>", self.open_search_results)
-
-        self.categories_frame = Frame(frame)
-        self.categories_frame.pack()
-        self.category_buttons = {}
-
         categories = getattr(self.cfg, "Categories", {})
         for category in categories:
             btn = Button(
