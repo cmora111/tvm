@@ -34,6 +34,7 @@ from tkinter import (
     OptionMenu,
     Scrollbar,
     StringVar,
+    filedialog,
     Text,
     Tk,
     Toplevel,
@@ -205,12 +206,92 @@ class ChainRunnerWindow:
         self.output.insert("end", "Chain started.\n")
         self.output.see("end")
 
-        Button(outer, text="Close", width=16, bg="red", fg="black", command=self.window.destroy).pack(pady=(8, 0))
+        button_row = Frame(outer)
+        button_row.pack(fill=X, pady=(8, 0))
+
+        Button(
+            button_row,
+            text="Copy Log",
+            width=14,
+            bg="#2f5597",
+            fg="white",
+            command=self.copy_log,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            button_row,
+            text="Save Log",
+            width=14,
+            bg="#3d6d3d",
+            fg="white",
+            command=self.save_log,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            button_row,
+            text="Clear Log",
+            width=14,
+            bg="#7f6000",
+            fg="white",
+            command=self.clear_log,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            button_row,
+            text="Close",
+            width=14,
+            bg="red",
+            fg="black",
+            command=self.window.destroy,
+        ).pack(side=RIGHT)
 
     def log(self, marker: str, message: str) -> None:
         self.output.insert("end", f"{marker} {message}\n")
         self.output.see("end")
         self.output.update_idletasks()
+
+    def get_log_text(self) -> str:
+        return self.output.get("1.0", END).strip()
+
+
+    def copy_log(self) -> None:
+        text = self.get_log_text()
+        if not text:
+            messagebox.showinfo("Copy Log", "Log is empty.")
+            return
+
+        self.window.clipboard_clear()
+        self.window.clipboard_append(text)
+        self.window.update()
+        messagebox.showinfo("Copy Log", "Chain log copied to clipboard.")
+
+
+    def save_log(self) -> None:
+        text = self.get_log_text()
+        if not text:
+            messagebox.showinfo("Save Log", "Log is empty.")
+            return
+
+        target = filedialog.asksaveasfilename(
+            title="Save Chain Execution Log",
+            defaultextension=".log",
+            initialfile="termforge_chain.log",
+            filetypes=[
+                ("Log files", "*.log"),
+                ("Text files", "*.txt"),
+                ("All files", "*.*"),
+            ],
+        )
+
+        if not target:
+            return
+
+        Path(target).write_text(text + "\n", encoding="utf-8")
+        messagebox.showinfo("Save Log", f"Saved chain log to:\n\n{target}")
+
+
+    def clear_log(self) -> None:
+        self.output.delete("1.0", END)
 
     def step_running(self, index: int, total: int, message: str) -> None:
         self.log("[>]", f"[{index}/{total}] {message}")
@@ -3838,7 +3919,6 @@ class TermForgeApp:
         file_menu.add_command(label="Export Config Backup", command=self.export_config_backup)
         file_menu.add_command(label="Import Config Backup", command=self.import_config_backup)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.on_close)
         file_menu.add_command(label="Exit", command=self.on_close)
         menubar.add_cascade(label="File", menu=file_menu)
 
