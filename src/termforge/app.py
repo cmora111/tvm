@@ -98,6 +98,7 @@ def ensure_user_config() -> None:
         "DisabledPlugins = []",
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
         "ChainTemplates = {}",
+        "Tags = {}",
         "",
     ]
     CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
@@ -975,6 +976,7 @@ class ChainBuilderWindow:
                 "Ctrl+R         Run selected step",
                 "Ctrl+Shift+R   Run selected step to end",
                 "Ctrl+Shift+D   Dry run preview",
+                "Ctrl+T         Edit Tags",
             ])
         )
 
@@ -2076,12 +2078,42 @@ class CommandPaletteWindow:
         self.listbox.bind("<Control-F>", self.toggle_favorite_selected)
         self.window.bind("<Delete>", self.delete_selected)
         self.listbox.bind("<Delete>", self.delete_selected)
+        self.window.bind("<Control-t>", self.edit_tags_selected)
+        self.window.bind("<Control-T>", self.edit_tags_selected)
+        self.listbox.bind("<Control-t>", self.edit_tags_selected)
+        self.listbox.bind("<Control-T>", self.edit_tags_selected)
         self.window.bind("<F2>", self.rename_selected)
         self.listbox.bind("<F2>", self.rename_selected)
 
         self.refresh()
         self.search_entry.focus_set()
 
+
+    def edit_tags_selected(self, event=None):
+        item = self.selected_item()
+        if not item:
+            return "break"
+
+        category = item["category"]
+        name = item["name"]
+        current = " ".join(self.app.get_command_tags(category, name))
+
+        prompt = MultiFieldPrompt(
+            self.window,
+            "Edit Tags",
+            ["tags"],
+            defaults={"tags": current},
+            heading=f"Tags for {category}/{name}",
+        )
+
+        values = prompt.show()
+        if values is None:
+            return "break"
+
+        self.app.set_command_tags(category, name, values.get("tags", ""))
+        self.refresh()
+        self.app.set_status(f"Updated tags for {category}/{name}")
+        return "break"
 
     def fuzzy_match_score(self, query: str, text: str):
         query = query.strip().lower()
@@ -2141,6 +2173,9 @@ class CommandPaletteWindow:
             if name_score is not None:
                 candidates.append(name_score)
 
+            if tag_score is not None:
+                candidates.append(500 + tag_score)
+
             if category_score is not None:
                 candidates.append(1000 + category_score)
 
@@ -2168,6 +2203,8 @@ class CommandPaletteWindow:
         recent_list = self.app.get_recent()
         recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
         usage = self.app.get_usage()
+        tags = self.app.get_command_tags(category, name)
+        tag_text = " ".join(tags)
 
         for category in sorted(categories.keys()):
             commands = categories.get(category, {})
@@ -2199,6 +2236,7 @@ class CommandPaletteWindow:
                     "recent_rank": recent_rank,
                     "usage_count": usage_count,
                     "search_blob": f"{category} {name} {preview}".lower(),
+                    "tags": tags,
                 })
 
         items.sort(
@@ -2577,6 +2615,43 @@ class TermForgeApp:
             self.root.quit()
         finally:
             self.root.destroy()
+
+    def get_tags(self) -> dict:
+        tags = getattr(self.cfg, "Tags", {})
+        if not isinstance(tags, dict):
+            tags = {}
+            setattr(self.cfg, "Tags", tags)
+        return tags
+
+
+    def command_key(self, category: str, name: str) -> str:
+        return f"{category}/{name}"
+
+
+    def get_command_tags(self, category: str, name: str) -> list[str]:
+        tags = self.get_tags()
+        value = tags.get(self.command_key(category, name), [])
+        if not isinstance(value, list):
+            return []
+        return [str(tag).strip() for tag in value if str(tag).strip()]
+
+
+    def set_command_tags(self, category: str, name: str, tag_text: str) -> None:
+        tags = self.get_tags()
+        key = self.command_key(category, name)
+
+        parsed = [
+            tag.strip()
+            for tag in re.split(r"[,\s]+", tag_text)
+            if tag.strip()
+        ]
+
+        if parsed:
+            tags[key] = parsed
+        else:
+            tags.pop(key, None)
+
+        self.persist_full_config()
 
     def add_history_entry(self, action_type, command_text, source="manual") -> None:
         entry = {
@@ -3817,6 +3892,7 @@ class TermForgeApp:
             disabled_plugins = getattr(self.cfg, "DisabledPlugins", [])
             categories = getattr(self.cfg, "Categories", {})
             chain_templates = getattr(self.cfg, "ChainTemplates", {})
+            tags = getattr(self.cfg, "Tags", {})
 
             lines = [
                 "# TermForge user configuration",
@@ -3831,6 +3907,7 @@ class TermForgeApp:
                 f"DisabledPlugins = {pprint.pformat(disabled_plugins, indent=4)}",
                 f"ChainTemplates = {pprint.pformat(chain_templates, indent=4)}",
                 f"Categories = {pprint.pformat(categories, indent=4)}",
+                f"Tags = {pprint.pformat(tags, indent=4)}",
                 "",
             ]
 
