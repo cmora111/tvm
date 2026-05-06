@@ -185,7 +185,7 @@ class ChainRunnerWindow:
     def __init__(self, parent, total_steps: int):
         self.window = Toplevel(parent)
         self.window.title("Chain Runner")
-        self.window.geometry("760x360")
+        self.window.geometry("820x500")
         self.window.transient(parent)
 
         outer = Frame(self.window, padx=8, pady=8)
