@@ -2622,7 +2622,34 @@ class TermForgeApp:
             cmd = step[1]
             options = step[2] if len(step) > 2 else {}
 
+        if isinstance(cmd, str) and self.is_dangerous_command(cmd):
+            if not self.confirm_dangerous_command(cmd):
+                raise TermForgeError("Command cancelled by user.")
+
         self.run_cmd(cmd_type, cmd, options, None)
+
+    def is_dangerous_command(self, cmd: str) -> bool:
+        cmd_lower = cmd.lower()
+        dangerous_patterns = [
+            "sudo",
+            "rm -rf",
+            "mkfs",
+            "dd ",
+            "shutdown",
+            "reboot",
+            "poweroff",
+            "systemctl",
+            ":(){:|:&};:",
+        ]
+        return any(pattern in cmd_lower for pattern in dangerous_patterns)
+
+
+    def confirm_dangerous_command(self, cmd: str) -> bool:
+        return messagebox.askokcancel(
+            "Dangerous Command",
+            f"This command may be dangerous:\n\n{cmd}\n\nContinue?"
+        )
+
 
     def get_chain_templates(self) -> dict:
         templates = getattr(self.cfg, "ChainTemplates", {})
@@ -3351,6 +3378,11 @@ class TermForgeApp:
                         runner.step_failed("Chain cancelled.")
                         return
 
+                if isinstance(step_cmd, str) and self.is_dangerous_command(step_cmd):
+                    if not self.confirm_dangerous_command(step_cmd):
+                        runner.step_failed("Command cancelled by user.")
+                        return
+
                 runner.step_running(index, total, str(step_cmd))
 
                 self.run_cmd(
@@ -3446,6 +3478,15 @@ class TermForgeApp:
         record_history: bool = True,
         shared_vars: dict[str, str] | None = None,
     ) -> None:
+
+        if options is None:
+            options = {}
+
+        if isinstance(cmd, str) and self.is_dangerous_command(cmd):
+            if not options.get("confirm", False):
+                if not self.confirm_dangerous_command(cmd):
+                    self.set_status("Command cancelled.")
+                    return
         try:
             if options is None:
                 options = {}
