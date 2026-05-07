@@ -183,18 +183,21 @@ class MultiFieldPrompt:
 
 
 class ChainRunnerWindow:
-    def __init__(self, parent, total_steps: int):
+    def __init__(self, parent, total_steps: int):  # ✅
         self.window = Toplevel(parent)
         self.window.title("Chain Runner")
         self.window.geometry("820x500")
         self.window.transient(parent)
+        self.last_run_start_index = "1.0"
 
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
+        self.header_var = StringVar(value=f"Chain Runner — {total_steps} step(s)")
+
         Label(
             outer,
-            text=f"Chain Runner — {total_steps} step(s)",
+            textvariable=self.header_var,
             bd=4,
             width=40,
             bg="lightgreen",
@@ -202,13 +205,20 @@ class ChainRunnerWindow:
             relief="raised",
         ).pack(pady=(0, 8))
 
-        self.output = Text(outer, wrap="word", height=18, width=90)
-        self.output.pack(fill=BOTH, expand=True)
-        self.output.insert("end", "Chain started.\n")
-        self.output.see("end")
+        self.output = Text(outer, wrap="word", height=12, width=90)
+        self.output.pack(fill=BOTH, expand=True, pady=(0, 8))
 
         button_row = Frame(outer)
-        button_row.pack(fill=X, pady=(8, 0))
+        button_row.pack(fill=X, side="bottom", pady=(8, 0))
+
+        self.header_var = StringVar(value=f"Chain Runner — {total_steps} step(s)")
+
+        Label(
+            outer,
+            textvariable=self.header_var,
+        )
+
+        button_row = Frame(outer)
 
         Button(
             button_row,
@@ -217,6 +227,15 @@ class ChainRunnerWindow:
             bg="#2f5597",
             fg="white",
             command=self.copy_log,
+        ).pack(side=LEFT, padx=(0, 6))
+
+        Button(
+            button_row,
+            text="Copy Last Run",
+            width=16,
+            bg="#4b4b88",
+            fg="white",
+            command=self.copy_last_run,
         ).pack(side=LEFT, padx=(0, 6))
 
         Button(
@@ -245,9 +264,57 @@ class ChainRunnerWindow:
             fg="black",
             command=self.window.destroy,
         ).pack(side=RIGHT)
+        button_row.pack(fill=X, side="bottom", pady=(8, 0))
+
+    def reset_for_run(self, total_steps: int) -> None:
+        try:
+            self.window.deiconify()
+            self.window.lift()
+            self.header_var.set(f"Chain Runner — {total_steps} step(s)")
+
+            self.log("", "")
+
+            # mark start of newest run
+            self.last_run_start_index = self.output.index("end-1c")
+
+            self.log("──", f"New chain run — {total_steps} step(s)")
+        except Exception:
+            pass
+
+    def get_last_run_text(self) -> str:
+        try:
+            return self.output.get(self.last_run_start_index, "end-1c").strip()
+        except Exception:
+            return ""
+
+    def copy_last_run(self) -> None:
+        text = self.get_last_run_text()
+
+        if not text:
+            messagebox.showinfo("Copy Last Run", "No recent chain run found.")
+            return
+
+        self.window.clipboard_clear()
+        self.window.clipboard_append(text)
+        self.window.update()
+
+        messagebox.showinfo(
+            "Copy Last Run",
+            "Last chain run copied to clipboard."
+        )
 
     def log(self, marker: str, message: str) -> None:
-        self.output.insert("end", f"{marker} {message}\n")
+        if not hasattr(self, "output"):
+            return
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+
+        if marker:
+            line = f"[{timestamp}] {marker} {message}"
+        else:
+            line = f"[{timestamp}] {message}"
+
+        self.output.insert("end", line + "\n")
         self.output.see("end")
         self.output.update_idletasks()
 
@@ -290,6 +357,26 @@ class ChainRunnerWindow:
         Path(target).write_text(text + "\n", encoding="utf-8")
         messagebox.showinfo("Save Log", f"Saved chain log to:\n\n{target}")
 
+
+    def exists(self) -> bool:
+        try:
+            return bool(self.window.winfo_exists())
+        except Exception:
+            return False
+
+
+    def reset_for_run(self, total_steps: int) -> None:
+        try:
+            self.window.deiconify()
+            self.window.lift()
+            self.header_var.set(f"Chain Runner — {total_steps} step(s)")
+
+            # 👇 ADD THIS LINE
+            self.log("", "")
+            self.log("──", f"New chain run — {total_steps} step(s)")
+
+        except Exception:
+            pass
 
     def clear_log(self) -> None:
         self.output.delete("1.0", END)
@@ -421,15 +508,15 @@ class HotkeyEditorWindow:
         command = self.command_var.get().strip()
 
         if not hotkey or not category or not command:
-            messagebox.showerror("Hotkey Editor", "Hotkey, category, and command are all required.")
+            self.show_traceback_window("Hotkey Editor", "Hotkey, category, and command are all required.")
             return
 
         categories = getattr(self.app.cfg, "Categories", {})
         if category not in categories:
-            messagebox.showerror("Hotkey Editor", f"Unknown category: {category}")
+            self.show_traceback_window("Hotkey Editor", f"Unknown category: {category}")
             return
         if command not in categories[category]:
-            messagebox.showerror("Hotkey Editor", f"Unknown command in {category}: {command}")
+            self.show_traceback_window("Hotkey Editor", f"Unknown command in {category}: {command}")
             return
 
         hotkeys = self.app.get_hotkeys_dict()
@@ -442,12 +529,12 @@ class HotkeyEditorWindow:
     def delete_mapping(self):
         hotkey = self.hotkey_var.get().strip()
         if not hotkey:
-            messagebox.showerror("Hotkey Editor", "Enter or select a hotkey to delete.")
+            self.show_traceback_window("Hotkey Editor", "Enter or select a hotkey to delete.")
             return
 
         hotkeys = self.app.get_hotkeys_dict()
         if hotkey not in hotkeys:
-            messagebox.showerror("Hotkey Editor", f"Hotkey not found: {hotkey}")
+            self.show_traceback_window("Hotkey Editor", f"Hotkey not found: {hotkey}")
             return
 
         del hotkeys[hotkey]
@@ -982,7 +1069,7 @@ class ChainBuilderWindow:
 
     def save_steps_as_template(self):
         if not self.steps:
-            messagebox.showerror("Chain Templates", "There are no steps to save.")
+            self.show_traceback_window("Chain Templates", "There are no steps to save.")
             return
 
         prompt = MultiFieldPrompt(
@@ -998,7 +1085,7 @@ class ChainBuilderWindow:
 
         name = values.get("template_name", "").strip()
         if not name:
-            messagebox.showerror("Chain Templates", "Template name is required.")
+            self.show_traceback_window("Chain Templates", "Template name is required.")
             return
 
         templates = self.app.get_chain_templates()
@@ -1019,7 +1106,7 @@ class ChainBuilderWindow:
     def choose_chain_template(self):
         templates = self.app.get_chain_templates()
         if not templates:
-            messagebox.showerror("Chain Templates", "No chain templates have been saved yet.")
+            self.show_traceback_window("Chain Templates", "No chain templates have been saved yet.")
             return None
 
         names = sorted(templates.keys())
@@ -1039,7 +1126,7 @@ class ChainBuilderWindow:
         name = values.get("template_name", "").strip()
         if name not in templates:
             available = "\n".join(names)
-            messagebox.showerror(
+            self.show_traceback_window(
                 "Chain Templates",
                 f"Unknown template: {name}\n\nAvailable templates:\n{available}"
             )
@@ -1106,7 +1193,7 @@ class ChainBuilderWindow:
         try:
             step = self.parse_current_step()
         except Exception as exc:
-            messagebox.showerror("Chain Builder", str(exc))
+            self.show_traceback_window("Chain Builder", str(exc))
             return
 
         idxs = self.listbox.curselection()
@@ -1130,7 +1217,7 @@ class ChainBuilderWindow:
     def apply_to_editor_now(self):
         errors = self.validate_chain()
         if errors:
-            messagebox.showerror("Validate Chain", "\n".join(errors))
+            self.show_traceback_window("Validate Chain", "\n".join(errors))
             return
 
         self.result = list(self.steps)
@@ -1193,7 +1280,7 @@ class ChainBuilderWindow:
         errors = self.validate_chain()
 
         if errors:
-            messagebox.showerror("Validate Chain", "\n".join(errors))
+            self.show_traceback_window("Validate Chain", "\n".join(errors))
             return False
 
         messagebox.showinfo("Validate Chain", "Chain looks valid.")
@@ -1204,7 +1291,7 @@ class ChainBuilderWindow:
         index = self.get_selected_step_index()
 
         if index is None:
-            messagebox.showerror("Run Selected Step", "Select a step first.")
+            self.show_traceback_window("Run Selected Step", "Select a step first.")
             return
 
         if index < 0 or index >= len(self.steps):
@@ -1216,7 +1303,7 @@ class ChainBuilderWindow:
             self.app.run_chain_step(step)
             self.app.set_status(f"Ran chain step #{index + 1}")
         except Exception as exc:
-            messagebox.showerror(
+            self.show_traceback_window(
                 "Run Selected Step",
                 f"Could not run selected step:\n\n{exc}"
             )
@@ -1230,7 +1317,7 @@ class ChainBuilderWindow:
         index = self.get_selected_step_index()
 
         if index is None:
-            messagebox.showerror("Run To End", "Select a step first.")
+            self.show_traceback_window("Run To End", "Select a step first.")
             return
 
         if index < 0 or index >= len(self.steps):
@@ -1249,7 +1336,7 @@ class ChainBuilderWindow:
                 break
 
         if failures:
-            messagebox.showerror(
+            self.show_traceback_window(
                 "Run To End",
                 "\n".join(failures)
             )
@@ -1381,7 +1468,7 @@ class ChainBuilderWindow:
         try:
             step = self.parse_current_step()
         except Exception as exc:
-            messagebox.showerror("Chain Builder", str(exc))
+            self.show_traceback_window("Chain Builder", str(exc))
             return
         idxs = self.listbox.curselection()
         if idxs:
@@ -1476,7 +1563,7 @@ class ChainBuilderWindow:
         errors = self.validate_chain()
 
         if errors:
-            messagebox.showerror("Validate Chain", "\n".join(errors))
+            self.show_traceback_window("Validate Chain", "\n".join(errors))
             return False
 
         messagebox.showinfo("Validate Chain", "Chain looks valid.")
@@ -1655,7 +1742,7 @@ class CommandEditorWindow:
             try:
                 initial = json.loads(current)
             except Exception as exc:
-                messagebox.showerror(
+                self.show_traceback_window(
                     "Chain Builder",
                     f"Could not parse current chain JSON:\n\n{exc}"
                 )
@@ -1757,7 +1844,7 @@ class CommandEditorWindow:
         try:
             category, name, entry = self._parse_form()
         except Exception as exc:
-            messagebox.showerror("Command Editor", str(exc))
+            self.show_traceback_window("Command Editor", str(exc))
             return
 
         categories = getattr(self.app.cfg, "Categories", None)
@@ -1786,7 +1873,7 @@ class CommandEditorWindow:
         categories = getattr(self.app.cfg, "Categories", {})
 
         if category not in categories or name not in categories[category]:
-            messagebox.showerror("Command Editor", "Selected command was not found.")
+            self.show_traceback_window("Command Editor", "Selected command was not found.")
             return
 
         del categories[category][name]
@@ -1808,7 +1895,7 @@ class CommandEditorWindow:
         categories = getattr(self.app.cfg, "Categories", {})
 
         if category not in categories or name not in categories[category]:
-            messagebox.showerror(
+            self.show_traceback_window(
                 "Command Editor",
                 f"Command not found: {category}/{name}"
             )
@@ -1943,11 +2030,11 @@ class CategoryEditorWindow:
             return
         name = values.get("category_name", "").strip()
         if not name:
-            messagebox.showerror("Category Editor", "Category name is required.")
+            self.show_traceback_window("Category Editor", "Category name is required.")
             return
         categories = self.get_categories()
         if name in categories:
-            messagebox.showerror("Category Editor", f"Category already exists: {name}")
+            self.show_traceback_window("Category Editor", f"Category already exists: {name}")
             return
         categories[name] = {}
         self.app.persist_categories()
@@ -1958,7 +2045,7 @@ class CategoryEditorWindow:
     def rename_category(self):
         old_name = self.selected_category_name()
         if not old_name:
-            messagebox.showerror("Category Editor", "Select a category to rename.")
+            self.show_traceback_window("Category Editor", "Select a category to rename.")
             return
         prompt = MultiFieldPrompt(
             self.window,
@@ -1972,11 +2059,11 @@ class CategoryEditorWindow:
             return
         new_name = values.get("new_name", "").strip()
         if not new_name:
-            messagebox.showerror("Category Editor", "New category name is required.")
+            self.show_traceback_window("Category Editor", "New category name is required.")
             return
         categories = self.get_categories()
         if new_name != old_name and new_name in categories:
-            messagebox.showerror("Category Editor", f"Category already exists: {new_name}")
+            self.show_traceback_window("Category Editor", f"Category already exists: {new_name}")
             return
         categories[new_name] = categories.pop(old_name)
         self.app.persist_categories()
@@ -1987,12 +2074,12 @@ class CategoryEditorWindow:
     def delete_category(self):
         name = self.selected_category_name()
         if not name:
-            messagebox.showerror("Category Editor", "Select a category to delete.")
+            self.show_traceback_window("Category Editor", "Select a category to delete.")
             return
         categories = self.get_categories()
         commands = categories.get(name, {})
         if isinstance(commands, dict) and commands:
-            messagebox.showerror(
+            self.show_traceback_window(
                 "Category Editor",
                 "Category is not empty. Delete or move its commands first.",
             )
@@ -2525,7 +2612,7 @@ class CommandPaletteWindow:
 
         new_name = values.get("new_name", "").strip()
         if not new_name:
-            messagebox.showerror("Rename Command", "New command name is required.")
+            self.show_traceback_window("Rename Command", "New command name is required.")
             return "break"
 
         self.app.rename_command(category, old_name, new_name)
@@ -2567,10 +2654,86 @@ class TermForgeApp:
         self.initialize_hotkeys()
         self.root.after(250, self.safe_initial_select)
 
+    def show_traceback_window(self, title: str, exc: Exception) -> None:
+        import traceback
+
+        tb = traceback.format_exc()
+
+        win = Toplevel(self.root)
+        win.title(title)
+        win.geometry("1000x700")
+
+        outer = Frame(win, padx=8, pady=8)
+        outer.pack(fill=BOTH, expand=True)
+
+        Label(
+            outer,
+            text=title,
+            bg="#aa3333",
+            fg="white",
+            relief="raised",
+            bd=4,
+            width=40,
+        ).pack(fill=X, pady=(0, 8))
+
+        text = Text(outer, wrap="none")
+        text.pack(fill=BOTH, expand=True)
+
+        yscroll = Scrollbar(text, orient="vertical", command=text.yview)
+        xscroll = Scrollbar(text, orient="horizontal", command=text.xview)
+
+        text.configure(
+            yscrollcommand=yscroll.set,
+            xscrollcommand=xscroll.set,
+        )
+
+        yscroll.pack(side=RIGHT, fill=Y)
+        xscroll.pack(side=BOTTOM, fill=X)
+
+        text.insert(
+            "1.0",
+            f"{type(exc).__name__}: {exc}\n\n{tb}"
+        )
+
+        button_row = Frame(outer)
+        button_row.pack(fill=X, pady=(8, 0))
+
+        def copy_all():
+            win.clipboard_clear()
+            win.clipboard_append(text.get("1.0", END))
+            win.update()
+
+        Button(
+            button_row,
+            text="Copy Traceback",
+            width=18,
+            bg="#2f5597",
+            fg="white",
+            command=copy_all,
+        ).pack(side=LEFT)
+
+        Button(
+            button_row,
+            text="Close",
+            width=14,
+            bg="red",
+            fg="black",
+            command=win.destroy,
+        ).pack(side=RIGHT)
+
     def log(self, message: str) -> None:
-        if self.debug:
-            print(message)
-        logging.info(message)
+        # Internal app logger.
+        # Intentionally silent unless debug mode is enabled.
+        try:
+            debug_enabled = getattr(self.cfg, "debug", {}).get("Flag", False)
+        except Exception:
+            debug_enabled = False
+
+        if debug_enabled:
+            try:
+                print(f"[TermForge] {message}")
+            except Exception:
+                pass
 
     def set_status(self, message: str) -> None:
         self.status_var.set(message)
@@ -2615,6 +2778,17 @@ class TermForgeApp:
             self.root.quit()
         finally:
             self.root.destroy()
+
+    def get_chain_runner(self, total_steps: int):
+        runner = getattr(self, "chain_runner_window", None)
+
+        if runner is None or not runner.exists():
+            runner = ChainRunnerWindow(self.root, total_steps)
+            self.chain_runner_window = runner
+        else:
+            runner.reset_for_run(total_steps)
+
+        return runner
 
     def get_tags(self) -> dict:
         tags = getattr(self.cfg, "Tags", {})
@@ -3408,7 +3582,7 @@ class TermForgeApp:
                 return
             shared_vars.update(values)
 
-        runner = ChainRunnerWindow(self.root, total)
+        runner = self.get_chain_runner(total)
 
         for index, step in enumerate(steps, start=1):
             if not isinstance(step, (list, tuple)) or not step:
@@ -3767,7 +3941,7 @@ class TermForgeApp:
     def export_config_backup(self) -> None:
         try:
             if not CONFIG_FILE.exists():
-                messagebox.showerror("Export Config", "Config file does not exist yet.")
+                self.show_traceback_window("Export Config", "Config file does not exist yet.". exc)
                 return
 
             target = filedialog.asksaveasfilename(
@@ -3788,7 +3962,7 @@ class TermForgeApp:
             messagebox.showinfo("Export Config", f"Config exported to:\n\n{target}")
 
         except Exception as exc:
-            messagebox.showerror("Export Config", str(exc))
+            self.show_traceback_window("Export Config", exc)
 
 
     def import_config_backup(self) -> None:
@@ -3813,14 +3987,14 @@ class TermForgeApp:
             # Validate before replacing current config.
             spec = importlib.util.spec_from_file_location("termforge_import_test", source)
             if spec is None or spec.loader is None:
-                messagebox.showerror("Import Config", "Could not read selected config file.")
+                self.show_traceback_window("Import Config", "Could not read selected config file.")
                 return
 
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
 
             if not hasattr(module, "Categories"):
-                messagebox.showerror("Import Config", "Selected file does not contain Categories.")
+                self.show_traceback_window("Import Config", "Selected file does not contain Categories.")
                 return
 
             backup_current = CONFIG_FILE.with_suffix(".py.before_import")
@@ -3842,7 +4016,7 @@ class TermForgeApp:
             )
 
         except Exception as exc:
-            messagebox.showerror("Import Config", str(exc))
+            self.traceback_window("Import Config", str(exc))
 
     def reload_from_config_with_notice(self, silent: bool = False) -> None:
         try:
@@ -3857,7 +4031,7 @@ class TermForgeApp:
                 messagebox.showinfo("Reloaded", "Config reloaded.")
         except Exception as exc:
             if not silent:
-                messagebox.showerror("Reload failed", str(exc))
+                self.show_traceback_window("Reload failed", str(exc))
             else:
                 self.log(f"Silent reload failed: {exc}")
 
