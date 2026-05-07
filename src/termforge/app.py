@@ -281,11 +281,18 @@ class ChainRunnerWindow:
         except Exception:
             pass
 
+    def get_log_text(self) -> str:
+        return self.output.get("1.0", "end-1c").strip()
+
     def get_last_run_text(self) -> str:
-        try:
-            return self.output.get(self.last_run_start_index, "end-1c").strip()
-        except Exception:
-            return ""
+        text = self.get_log_text()
+        marker = "── New chain run"
+
+        pos = text.rfind(marker)
+        if pos == -1:
+            return text.strip()
+
+        return text[pos:].strip()
 
     def copy_last_run(self) -> None:
         text = self.get_last_run_text()
@@ -318,12 +325,9 @@ class ChainRunnerWindow:
         self.output.see("end")
         self.output.update_idletasks()
 
-    def get_log_text(self) -> str:
-        return self.output.get("1.0", END).strip()
-
-
     def copy_log(self) -> None:
-        text = self.get_log_text()
+        text = self.output.get("1.0", "end-1c").strip()
+
         if not text:
             messagebox.showinfo("Copy Log", "Log is empty.")
             return
@@ -331,7 +335,7 @@ class ChainRunnerWindow:
         self.window.clipboard_clear()
         self.window.clipboard_append(text)
         self.window.update()
-        messagebox.showinfo("Copy Log", "Chain log copied to clipboard.")
+        messagebox.showinfo("Copy Log", "Full chain log copied to clipboard.")
 
 
     def save_log(self) -> None:
