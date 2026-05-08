@@ -99,10 +99,60 @@ def ensure_user_config() -> None:
         f"Categories = {repr(getattr(default_config, 'Categories', {}))}",
         "ChainTemplates = {}",
         "Tags = {}",
+        "Schedules = []",
         "",
     ]
     CONFIG_FILE.write_text("\n".join(lines), encoding="utf-8")
 
+def start_scheduler(self) -> None:
+    self.run_startup_schedules()
+    self.root.after(30_000, self.scheduler_tick)
+
+
+def get_schedules(self) -> list:
+    schedules = getattr(self.cfg, "Schedules", [])
+    if not isinstance(schedules, list):
+        schedules = []
+        setattr(self.cfg, "Schedules", schedules)
+    return schedules
+
+
+def run_startup_schedules(self) -> None:
+    for schedule in self.get_schedules():
+        if schedule.get("enabled") and schedule.get("type") == "startup":
+            self.run_scheduled_command(schedule)
+
+
+def scheduler_tick(self) -> None:
+    from datetime import datetime
+
+    now = datetime.now()
+    now_hhmm = now.strftime("%H:%M")
+
+    for schedule in self.get_schedules():
+        if not schedule.get("enabled"):
+            continue
+
+        schedule_type = schedule.get("type")
+
+        if schedule_type == "daily":
+            if schedule.get("time") == now_hhmm:
+                last_run_key = now.strftime("%Y-%m-%d %H:%M")
+                if schedule.get("_last_run") != last_run_key:
+                    schedule["_last_run"] = last_run_key
+                    self.run_scheduled_command(schedule)
+
+        elif schedule_type == "interval_minutes":
+            minutes = int(schedule.get("minutes", 0) or 0)
+            if minutes > 0:
+                last = schedule.get("_last_tick")
+                current_tick = int(now.timestamp() // (minutes * 60))
+                if last != current_tick:
+                    schedule["_last_tick"] = current_tick
+                    self.run_scheduled_command(schedule)
+
+    self.persist_full_config()
+    self.root.after(30_000, self.scheduler_tick)
 
 def parse_command_entry(entry):
     if isinstance(entry, (list, tuple)):
@@ -2294,8 +2344,6 @@ class CommandPaletteWindow:
         recent_list = self.app.get_recent()
         recent = {(c, s): i for i, (c, s) in enumerate(recent_list)}
         usage = self.app.get_usage()
-        tags = self.app.get_command_tags(category, name)
-        tag_text = " ".join(tags)
 
         for category in sorted(categories.keys()):
             commands = categories.get(category, {})
@@ -2304,6 +2352,8 @@ class CommandPaletteWindow:
 
             for name in sorted(commands.keys()):
                 entry = commands[name]
+                tags = self.app.get_command_tags(category, name)
+                tag_text = " ".join(tags)
                 try:
                     cmd_type, cmd, options = self.app.parse_command_entry_public(entry)
                 except Exception:
@@ -2654,6 +2704,7 @@ class TermForgeApp:
         self.log("Starting TermForge")
         self.load_plugins(force=True)
         self.build_main()
+        self.start_scheduler()
         self.bind_global_shortcuts()
         self.initialize_hotkeys()
         self.root.after(250, self.safe_initial_select)
@@ -2782,6 +2833,19 @@ class TermForgeApp:
             self.root.quit()
         finally:
             self.root.destroy()
+
+    def run_scheduled_command(self, schedule: dict) -> None:
+        category = schedule.get("category")
+        command = schedule.get("command")
+
+        categories = getattr(self.cfg, "Categories", {})
+
+        if category not in categories or command not in categories[category]:
+            self.log(f"Scheduled command not found: {category}/{command}")
+            return
+
+        self.set_status(f"Running scheduled command: {category}/{command}")
+        self.select_cmd(None, category, command)
 
     def get_chain_runner(self, total_steps: int):
         runner = getattr(self, "chain_runner_window", None)
@@ -3776,6 +3840,85 @@ class TermForgeApp:
         except Exception as exc:
             self.show_error("Command failed", f"{exc}\n\n{traceback.format_exc()}")
 
+    def get_schedules(self) -> list:
+        schedules = getattr(self.cfg, "Schedules", [])
+        if not isinstance(schedules, list):
+            schedules = []
+            setattr(self.cfg, "Schedules", schedules)
+        return schedules
+
+
+    def run_scheduled_command(self, schedule: dict) -> None:
+        category = schedule.get("category")
+        command = schedule.get("command")
+
+        categories = getattr(self.cfg, "Categories", {})
+
+        if category not in categories:
+            self.log(f"Scheduled category not found: {category}")
+            return
+
+        if command not in categories[category]:
+            self.log(f"Scheduled command not found: {category}/{command}")
+            return
+
+        self.set_status(f"Running scheduled command: {category}/{command}")
+
+        try:
+            self.select_cmd(None, category, command)
+        except Exception as exc:
+            self.show_traceback_window(
+                f"Scheduled Command Failed: {category}/{command}",
+                exc,
+            )
+
+
+    def run_startup_schedules(self) -> None:
+        for schedule in self.get_schedules():
+            if schedule.get("enabled") and schedule.get("type") == "startup":
+                self.run_scheduled_command(schedule)
+
+
+    def scheduler_tick(self) -> None:
+        from datetime import datetime
+
+        now = datetime.now()
+        now_hhmm = now.strftime("%H:%M")
+
+        for schedule in self.get_schedules():
+            if not schedule.get("enabled"):
+                continue
+
+            schedule_type = schedule.get("type")
+
+            if schedule_type == "daily":
+                if schedule.get("time") == now_hhmm:
+                    last_run_key = now.strftime("%Y-%m-%d %H:%M")
+
+                    if schedule.get("_last_run") != last_run_key:
+                        schedule["_last_run"] = last_run_key
+                        self.run_scheduled_command(schedule)
+
+            elif schedule_type == "interval_minutes":
+                minutes = int(schedule.get("minutes", 0) or 0)
+
+                if minutes > 0:
+                    current_tick = int(now.timestamp() // (minutes * 60))
+
+                    if schedule.get("_last_tick") != current_tick:
+                        schedule["_last_tick"] = current_tick
+                        self.run_scheduled_command(schedule)
+
+        self.persist_full_config()
+
+        # run again in 30 seconds
+        self.root.after(30_000, self.scheduler_tick)
+
+
+    def start_scheduler(self) -> None:
+        self.run_startup_schedules()
+        self.root.after(30_000, self.scheduler_tick)
+
     def select_cmd(self, parent_window, category: str, subcategory: str) -> None:
         entry = self.cfg.Categories[category][subcategory]
         cmd_type, cmd, options = parse_command_entry(entry)
@@ -4071,6 +4214,7 @@ class TermForgeApp:
             categories = getattr(self.cfg, "Categories", {})
             chain_templates = getattr(self.cfg, "ChainTemplates", {})
             tags = getattr(self.cfg, "Tags", {})
+            schedules = getattr(self.cfg, "Schedules", [])
 
             lines = [
                 "# TermForge user configuration",
@@ -4086,6 +4230,7 @@ class TermForgeApp:
                 f"ChainTemplates = {pprint.pformat(chain_templates, indent=4)}",
                 f"Categories = {pprint.pformat(categories, indent=4)}",
                 f"Tags = {pprint.pformat(tags, indent=4)}",
+                f"Schedules = {pprint.pformat(schedules, indent=4)}",
                 "",
             ]
 
