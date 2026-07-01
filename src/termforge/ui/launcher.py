@@ -17,15 +17,7 @@ class HotkeyEditorWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Hotkey Editor",
-            bd=4,
-            width=32,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Hotkey Editor", bd=4, width=32, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         top = Frame(outer)
         top.pack(fill=BOTH, expand=True)

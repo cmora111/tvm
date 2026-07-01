@@ -24,45 +24,14 @@ class ChainBuilderWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Visual Chain Builder",
-            bd=4,
-            width=32,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Visual Chain Builder", bd=4, width=32, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         top_actions = Frame(outer)
         top_actions.pack(fill=X, pady=(0, 8))
 
-        Button(
-            top_actions,
-            text="Apply to Editor",
-            width=18,
-            bg="navy",
-            fg="white",
-            command=self.apply_to_editor_now,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            top_actions,
-            text="Templates",
-            width=14,
-            bg="#555577",
-            fg="white",
-            command=self.manage_chain_templates,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            top_actions,
-            text="Close",
-            width=12,
-            bg="red",
-            fg="black",
-            command=self.close,
-        ).pack(side=RIGHT)
+        Button(top_actions, text="Apply to Editor", width=18, bg="navy", fg="white", command=self.apply_to_editor_now,).pack(side=LEFT, padx=(0, 6))
+        Button(top_actions, text="Templates", width=14, bg="#555577", fg="white", command=self.manage_chain_templates,).pack(side=LEFT, padx=(0, 6))
+        Button(top_actions, text="Close", width=12, bg="red", fg="black", command=self.close,).pack(side=RIGHT)
 
         top = Frame(outer)
         top.pack(fill=BOTH, expand=True)
@@ -104,8 +73,7 @@ class ChainBuilderWindow:
         row += 1
 
         self.hint_var = StringVar(value="")
-        Label(form, textvariable=self.hint_var, anchor="w",
-              fg="#333333").grid(row=row, column=1, sticky="w", pady=(0, 6))
+        Label(form, textvariable=self.hint_var, anchor="w", fg="#333333").grid(row=row, column=1, sticky="w", pady=(0, 6))
 
         help_box = Text(right, height=14, wrap="word")
         help_box.pack(fill=BOTH, expand=True, pady=(10, 0))
@@ -137,54 +105,12 @@ class ChainBuilderWindow:
         btns = Frame(outer)
         btns.pack(fill=X, pady=(10, 0))
         Button(btns, text="Add / Update Step", width=16, bg="darkgreen", fg="white", command=self.add_or_update_step).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Insert Before",
-            width=14,
-            bg="#2f5597",
-            fg="white",
-            command=self.insert_step_before,
-        ).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Remove Step",
-            width=14,
-            bg="#7f6000",
-            fg="white",
-            command=self.remove_selected_step,
-        ).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Validate Chain",
-            width=14,
-            bg="#555577",
-            fg="white",
-            command=self.validate_chain_with_notice,
-        ).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Run Selected Step",
-            width=16,
-            bg="#2f5597",
-            fg="white",
-            command=self.run_selected_step,
-        ).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Dry Run",
-            width=12,
-            bg="#555577",
-            fg="white",
-            command=self.show_dry_run_preview,
-        ).pack(side=LEFT, padx=(0, 6))
-        Button(
-            btns,
-            text="Dry Run + Vars",
-            width=14,
-            bg="#555577",
-            fg="white",
-            command=self.show_dry_run_preview_with_values,
-        ).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Insert Before", width=14, bg="#2f5597", fg="white", command=self.insert_step_before,).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Remove Step", width=14, bg="#7f6000", fg="white", command=self.remove_selected_step,).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Validate Chain", width=14, bg="#555577", fg="white", command=self.validate_chain_with_notice,).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Run Selected Step", width=16, bg="#2f5597", fg="white", command=self.run_selected_step,).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Dry Run", width=12, bg="#555577", fg="white", command=self.show_dry_run_preview,).pack(side=LEFT, padx=(0, 6))
+        Button(btns, text="Dry Run + Vars", width=14, bg="#555577", fg="white", command=self.show_dry_run_preview_with_values,).pack(side=LEFT, padx=(0, 6))
         Button(btns, text="Load Selected", width=14, bg="#2f5597", fg="white", command=self.load_selected).pack(side=LEFT, padx=(0, 6))
 
         self.drag_index = None

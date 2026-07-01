@@ -13,15 +13,7 @@ class ProfileManagerWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Profile / Environment Manager",
-            bd=4,
-            width=38,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Profile / Environment Manager", bd=4, width=38, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))
@@ -67,22 +59,14 @@ class ProfileManagerWindow:
 
         Label(form, text="Backend:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.backend_var = StringVar(value=self.app.get_backend_name())
-        self.backend_menu = OptionMenu(
-            form,
-            self.backend_var,
-            "x11",
-            "subprocess",
-            "tmux",
-        )
+        self.backend_menu = OptionMenu(form, self.backend_var, "x11", "subprocess", "tmux",)
 
         self.backend_menu.config(width=38)
         self.backend_menu.grid(row=row, column=1, sticky="w", pady=3)
         row += 1
 
         Label(form, text="Tmux Session:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
-        self.tmux_session_var = StringVar(
-            value=str(getattr(self.app.cfg, "TmuxSession", "termforge"))
-        )
+        self.tmux_session_var = StringVar(value=str(getattr(self.app.cfg, "TmuxSession", "termforge")))
         Entry(form, textvariable=self.tmux_session_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
         row += 1
 
@@ -92,9 +76,7 @@ class ProfileManagerWindow:
         row += 1
 
         Label(form, text="Tmux Mode:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
-        self.tmux_mode_var = StringVar(
-            value=str(getattr(self.app.cfg, "TmuxMode", "pane"))
-        )
+        self.tmux_mode_var = StringVar(value=str(getattr(self.app.cfg, "TmuxMode", "pane")))
         self.tmux_mode_menu = OptionMenu(form, self.tmux_mode_var, "pane", "job",)
         self.tmux_mode_menu.config(width=38)
         self.tmux_mode_menu.grid(row=row, column=1, sticky="w", pady=3)

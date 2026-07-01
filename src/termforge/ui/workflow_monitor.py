@@ -113,13 +113,9 @@ class WorkflowLiveMonitorWindow:
 
         self.listbox.grid(row=row, column=0, sticky="nsew")
         list_scroll.grid(row=row, column=1, sticky="ns")
+        row += 1
 
-        Label(
-            middle,
-            text="Summary",
-            bg="#dddddd",
-            relief="raised",
-        ).pack(fill=X)
+        Label(middle, text="Summary", bg="#dddddd", relief="raised",).pack(fill=X)
 
         summary_frame = Frame(middle)
         summary_frame.pack(fill=BOTH, expand=True)
@@ -178,17 +174,9 @@ class WorkflowLiveMonitorWindow:
 
         row = 0
 
-        self.details.grid(
-            row=row,
-            column=0,
-            sticky="nsew",
-        )
-
-        details_scroll_y.grid(
-            row=row,
-            column=1,
-            sticky="ns",
-        )
+        self.details.grid(row=row, column=0, sticky="nsew",)
+        details_scroll_y.grid(row=row, column=1, sticky="ns",)
+        row += 1
 
         self.snapshot = []
         self.listbox.bind("<<ListboxSelect>>", self.on_select)

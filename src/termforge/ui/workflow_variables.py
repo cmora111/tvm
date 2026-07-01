@@ -18,15 +18,7 @@ class WorkflowVariablesWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Workflow Variables",
-            bd=4,
-            width=34,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Workflow Variables", bd=4, width=34, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))
@@ -39,12 +31,7 @@ class WorkflowVariablesWindow:
         Button(action_row, text="Clear Runtime", width=14, bg="#7f6000", fg="white", command=self.clear_runtime).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Close", width=14, bg="red", fg="black", command=self.window.destroy,).pack(side=LEFT, padx=(0, 6))
 
-        body = PanedWindow(
-            outer,
-            orient=HORIZONTAL,
-            sashrelief=RAISED,
-            sashwidth=6,
-        )
+        body = PanedWindow(outer, orient=HORIZONTAL, sashrelief=RAISED, sashwidth=6,)
         body.pack(fill=BOTH, expand=True)
 
         left = Frame(body)
@@ -58,11 +45,7 @@ class WorkflowVariablesWindow:
         list_frame = Frame(left)
         list_frame.pack(fill=BOTH, expand=True)
 
-        self.listbox = Listbox(
-            list_frame,
-            width=48,
-            exportselection=False,
-        )
+        self.listbox = Listbox(list_frame, width=48, exportselection=False,)
         self.listbox.pack(side=LEFT, fill=BOTH, expand=True)
 
         scroll = Scrollbar(list_frame, command=self.listbox.yview)

@@ -14,15 +14,7 @@ class VariableManagerWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Variable Manager",
-            bd=4,
-            width=32,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Variable Manager", bd=4, width=32, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))
@@ -162,70 +154,19 @@ class EnvironmentTemplateWindow:
         self.window.geometry("980x620")
         self.window.transient(app.root)
 
-        outer = Frame(
-            self.window,
-            padx=8,
-            pady=8,
-        )
+        outer = Frame(self.window, padx=8, pady=8,)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Environment Templates",
-            bd=4,
-            width=36,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Environment Templates", bd=4, width=36, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))
 
-        Button(
-            action_row,
-            text="Save",
-            width=14,
-            bg="darkgreen",
-            fg="white",
-            command=self.save_template,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Delete",
-            width=14,
-            bg="#7f6000",
-            fg="white",
-            command=self.delete_template,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Activate",
-            width=14,
-            bg="#2f5597",
-            fg="white",
-            command=self.activate_template,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Refresh",
-            width=14,
-            bg="navy",
-            fg="white",
-            command=self.refresh,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Close",
-            width=14,
-            bg="red",
-            fg="black",
-            command=self.window.destroy,
-        ).pack(side=RIGHT)
+        Button(action_row, text="Save", width=14, bg="darkgreen", fg="white", command=self.save_template,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Delete", width=14, bg="#7f6000", fg="white", command=self.delete_template,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Activate", width=14, bg="#2f5597", fg="white", command=self.activate_template,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Refresh", width=14, bg="navy", fg="white", command=self.refresh,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Close", width=14, bg="red", fg="black", command=self.window.destroy,).pack(side=RIGHT)
 
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)
@@ -234,119 +175,46 @@ class EnvironmentTemplateWindow:
         body.columnconfigure(1, weight=1)
         body.rowconfigure(0, weight=1)
 
+        row = 0
+
         left = Frame(body)
-        left.grid(
-            row=0,
-            column=0,
-            sticky="nsew",
-        )
+        left.grid(row=row, column=0, sticky="nsew",)
 
         right = Frame(body)
-        right.grid(
-            row=0,
-            column=1,
-            sticky="nsew",
-            padx=(10, 0),
-        )
+        right.grid(row=row, column=1, sticky="nsew", padx=(10, 0),)
+        row += 1
 
-        self.listbox = Listbox(
-            left,
-            width=42,
-            height=24,
-            exportselection=False,
-        )
+        self.listbox = Listbox(left, width=42, height=24, exportselection=False,)
+        self.listbox.pack(side=LEFT, fill=BOTH, expand=True,)
 
-        self.listbox.pack(
-            side=LEFT,
-            fill=BOTH,
-            expand=True,
-        )
-
-        scrollbar = Scrollbar(
-            left,
-            command=self.listbox.yview,
-        )
-
+        scrollbar = Scrollbar(left, command=self.listbox.yview,)
         scrollbar.pack(side=RIGHT, fill=Y)
 
-        self.listbox.config(
-            yscrollcommand=scrollbar.set
-        )
+        self.listbox.config(yscrollcommand=scrollbar.set)
 
         form = Frame(right)
         form.pack(fill=X)
 
-        Label(
-            form,
-            text="Template Name:",
-            width=16,
-            anchor="w",
-        ).grid(
-            row=0,
-            column=0,
-            sticky="w",
-            pady=3,
-        )
+        row = 0
 
+        Label(form, text="Template Name:", width=16, anchor="w",).grid(row=row, column=0, sticky="w", pady=3,)
         self.name_var = StringVar()
+        Entry(form, textvariable=self.name_var, width=42,).grid(row=row, column=1, sticky="ew", pady=3,)
+        row += 1
 
-        Entry(
-            form,
-            textvariable=self.name_var,
-            width=42,
-        ).grid(
-            row=0,
-            column=1,
-            sticky="ew",
-            pady=3,
-        )
-
-        Label(
-            form,
-            text="Variables JSON:",
-            width=16,
-            anchor="nw",
-        ).grid(
-            row=1,
-            column=0,
-            sticky="nw",
-            pady=3,
-        )
-
-        self.variables_text = Text(
-            form,
-            height=14,
-            width=60,
-            wrap="word",
-        )
-
-        self.variables_text.grid(
-            row=1,
-            column=1,
-            sticky="nsew",
-            pady=3,
-        )
+        Label(form, text="Variables JSON:", width=16, anchor="nw",).grid(row=row, column=0, sticky="nw", pady=3,)
+        self.variables_text = Text(form, height=14, width=60, wrap="word",)
+        self.variables_text.grid(row=row, column=1, sticky="nsew", pady=3,)
+        row += 1
 
         form.columnconfigure(1, weight=1)
 
-        self.preview = Text(
-            right,
-            wrap="word",
-            height=12,
-        )
-
-        self.preview.pack(
-            fill=BOTH,
-            expand=True,
-            pady=(10, 0),
-        )
+        self.preview = Text(right, wrap="word", height=12,)
+        self.preview.pack(fill=BOTH, expand=True, pady=(10, 0),)
 
         self.snapshot = []
 
-        self.listbox.bind(
-            "<<ListboxSelect>>",
-            self.on_select,
-        )
+        self.listbox.bind("<<ListboxSelect>>", self.on_select,)
 
         self.refresh()
 

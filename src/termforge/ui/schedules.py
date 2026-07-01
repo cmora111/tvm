@@ -15,15 +15,7 @@ class ScheduleManagerWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Schedule Manager",
-            bd=4,
-            width=32,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Schedule Manager", bd=4, width=32, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))

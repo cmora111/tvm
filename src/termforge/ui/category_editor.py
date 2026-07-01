@@ -19,18 +19,11 @@ class CategoryEditorWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Category Editor",
-            bd=4,
-            width=30,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Category Editor", bd=4, width=30, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))
+
         Button(action_row, text="Create Category", width=16, bg="darkgreen", fg="white", command=self.create_category).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Rename Category", width=16, bg="#2f5597", fg="white", command=self.rename_category).pack(side=LEFT, padx=(0, 6))
         Button(action_row, text="Delete Category", width=16, bg="#7f6000", fg="white", command=self.delete_category).pack(side=LEFT, padx=(0, 6))

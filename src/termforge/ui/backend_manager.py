@@ -16,132 +16,44 @@ class BackendManagerWindow:
         outer = Frame(self.window, padx=8, pady=8)
         outer.pack(fill=BOTH, expand=True)
 
-        Label(
-            outer,
-            text="Backend Manager",
-            bd=4,
-            width=32,
-            bg="lightgreen",
-            fg="black",
-            relief="raised",
-        ).pack(pady=(0, 8))
+        Label(outer, text="Backend Manager", bd=4, width=32, bg="lightgreen", fg="black", relief="raised",).pack(pady=(0, 8))
 
         action_row = Frame(outer)
         action_row.pack(fill=X, pady=(0, 8))
 
-        Button(
-            action_row,
-            text="Auto-detect",
-            width=14,
-            bg="#555577",
-            fg="white",
-            command=self.auto_detect_backend,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Apply Backend",
-            width=16,
-            bg="darkgreen",
-            fg="white",
-            command=self.apply_backend,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Test Backend",
-            width=14,
-            bg="#2f5597",
-            fg="white",
-            command=self.test_backend,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Pick Tmux Target",
-            width=18,
-            bg="#555577",
-            fg="white",
-            command=self.pick_tmux_target,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Attach Tmux",
-            width=14,
-            bg="#3d6d3d",
-            fg="white",
-            command=self.attach_tmux,
-        ).pack(side=LEFT, padx=(0, 6))
-
-        Button(
-            action_row,
-            text="Close",
-            width=14,
-            bg="red",
-            fg="black",
-            command=self.window.destroy,
-        ).pack(side=RIGHT)
+        Button(action_row, text="Auto-detect", width=14, bg="#555577", fg="white", command=self.auto_detect_backend,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Apply Backend", width=16, bg="darkgreen", fg="white", command=self.apply_backend,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Test Backend", width=14, bg="#2f5597", fg="white", command=self.test_backend,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Pick Tmux Target", width=18, bg="#555577", fg="white", command=self.pick_tmux_target,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Attach Tmux", width=14, bg="#3d6d3d", fg="white", command=self.attach_tmux,).pack(side=LEFT, padx=(0, 6))
+        Button(action_row, text="Close", width=14, bg="red", fg="black", command=self.window.destroy,).pack(side=RIGHT)
 
         self.backend_var = StringVar(value=app.get_backend_name())
 
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)
 
-        Label(
-            body,
-            text="Backend:",
-            width=14,
-            anchor="w",
-        ).pack(anchor="w")
+        Label(body, text="Backend:", width=14, anchor="w",).pack(anchor="w")
 
-        self.backend_menu = OptionMenu(
-            body,
-            self.backend_var,
-            "x11",
-            "subprocess",
-            "tmux",
-        )
+        self.backend_menu = OptionMenu(body, self.backend_var, "x11", "subprocess", "tmux",)
 
         tmux_frame = Frame(body)
         tmux_frame.pack(fill=X, pady=(8, 8))
 
         row = 0
 
-        Label(
-            tmux_frame,
-            text="Tmux Session:",
-            width=14,
-            anchor="w",
-        ).grid(row=row, column=0, sticky="w", pady=3)
+        Label(tmux_frame, text="Tmux Session:", width=14, anchor="w",).grid(row=row, column=0, sticky="w", pady=3)
 
-        self.tmux_session_var = StringVar(
-            value=str(getattr(app.cfg, "TmuxSession", "termforge"))
-        )
+        self.tmux_session_var = StringVar(value=str(getattr(app.cfg, "TmuxSession", "termforge")))
 
-        Entry(
-            tmux_frame,
-            textvariable=self.tmux_session_var,
-            width=32,
-        ).grid(row=row, column=1, sticky="w", pady=3)
+        Entry(tmux_frame, textvariable=self.tmux_session_var, width=32,).grid(row=row, column=1, sticky="w", pady=3)
         row += 1
 
-        Label(
-            tmux_frame,
-            text="Tmux Pane:",
-            width=14,
-            anchor="w",
-        ).grid(row=row, column=0, sticky="w", pady=3)
+        Label(tmux_frame, text="Tmux Pane:", width=14, anchor="w",).grid(row=row, column=0, sticky="w", pady=3)
 
-        self.tmux_pane_var = StringVar(
-            value=str(getattr(app.cfg, "TmuxPane", ""))
-        )
+        self.tmux_pane_var = StringVar(value=str(getattr(app.cfg, "TmuxPane", "")))
 
-        Entry(
-            tmux_frame,
-            textvariable=self.tmux_pane_var,
-            width=32,
-        ).grid(row=row, column=1, sticky="w", pady=3)
+        Entry(tmux_frame, textvariable=self.tmux_pane_var, width=32,).grid(row=row, column=1, sticky="w", pady=3)
 
         self.backend_menu.config(width=32)
         self.backend_menu.pack(anchor="w", pady=(0, 8))
