@@ -72,67 +72,84 @@ class ScheduleManagerWindow:
         self.minutes_var = StringVar(value="1")
         self.enabled_var = IntVar(value=1)
 
-        Label(form, text="Target Type:", width=16, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
+        row = 0
+
+        Label(form, text="Target Type:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.target_type_menu = OptionMenu(form, self.target_type_var, "command", "workflow")
         self.target_type_menu.config(width=38)
-        self.target_type_menu.grid(row=0, column=1, sticky="w", pady=3)
+        self.target_type_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Name:", width=16, anchor="w").grid(row=1, column=0, sticky="w", pady=3)
-        Entry(form, textvariable=self.name_var, width=42).grid(row=1, column=1, sticky="ew", pady=3)
+        Label(form, text="Name:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        Entry(form, textvariable=self.name_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Category:", width=16, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
+        Label(form, text="Category:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.category_menu = OptionMenu(form, self.category_var, "")
         self.category_menu.config(width=38)
-        self.category_menu.grid(row=2, column=1, sticky="w", pady=3)
+        self.category_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Command:", width=16, anchor="w").grid(row=3, column=0, sticky="w", pady=3)
+        Label(form, text="Command:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.command_menu = OptionMenu(form, self.command_var, "")
         self.command_menu.config(width=38)
-        self.command_menu.grid(row=3, column=1, sticky="w", pady=3)
+        self.command_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Workflow:", width=16, anchor="w").grid(row=4, column=0, sticky="w", pady=3)
+        Label(form, text="Workflow:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.workflow_menu = OptionMenu(form, self.workflow_var, "")
         self.workflow_menu.config(width=38)
-        self.workflow_menu.grid(row=4, column=1, sticky="w", pady=3)
+        self.workflow_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Profile:", width=16, anchor="w").grid(row=5, column=0, sticky="w", pady=3)
+        Label(form, text="Profile:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.profile_menu = OptionMenu(form, self.profile_var, "")
         self.profile_menu.config(width=38)
-        self.profile_menu.grid(row=5, column=1, sticky="w", pady=3)
+        self.profile_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Priority:", width=16, anchor="w").grid(row=6, column=0, sticky="w", pady=3)
+        Label(form, text="Priority:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.priority_menu = OptionMenu(form, self.priority_var, "critical", "high", "normal", "low")
         self.priority_menu.config(width=38)
-        self.priority_menu.grid(row=6, column=1, sticky="w", pady=3)
+        self.priority_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Backend:", width=16, anchor="w").grid(row=7, column=0, sticky="w", pady=3)
+        Label(form, text="Backend:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.backend_menu = OptionMenu(form, self.backend_var, "", "x11", "subprocess", "tmux")
         self.backend_menu.config(width=38)
-        self.backend_menu.grid(row=7, column=1, sticky="w", pady=3)
+        self.backend_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Tmux Session:", width=16, anchor="w").grid(row=8, column=0, sticky="w", pady=3)
-        Entry(form, textvariable=self.tmux_session_var, width=42).grid(row=8, column=1, sticky="ew", pady=3)
+        Label(form, text="Tmux Session:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        Entry(form, textvariable=self.tmux_session_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Tmux Pane:", width=16, anchor="w").grid(row=9, column=0, sticky="w", pady=3)
-        Entry(form, textvariable=self.tmux_pane_var, width=42).grid(row=9, column=1, sticky="ew", pady=3)
+        Label(form, text="Tmux Pane:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        Entry(form, textvariable=self.tmux_pane_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Tmux Mode:", width=16, anchor="w").grid(row=10, column=0, sticky="w", pady=3)
+        Label(form, text="Tmux Mode:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.tmux_mode_menu = OptionMenu(form, self.tmux_mode_var, "pane", "job")
         self.tmux_mode_menu.config(width=38)
-        self.tmux_mode_menu.grid(row=10, column=1, sticky="w", pady=3)
+        self.tmux_mode_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Type:", width=16, anchor="w").grid(row=11, column=0, sticky="w", pady=3)
+        Label(form, text="Type:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.type_menu = OptionMenu(form, self.type_var, "startup", "daily", "interval_minutes")
         self.type_menu.config(width=38)
-        self.type_menu.grid(row=11, column=1, sticky="w", pady=3)
+        self.type_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
-        Label(form, text="Daily Time HH:MM:", width=16, anchor="w").grid(row=12, column=0, sticky="w", pady=3)
-        Entry(form, textvariable=self.time_var, width=42).grid(row=12, column=1, sticky="ew", pady=3)
+        Label(form, text="Daily Time HH:MM:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        Entry(form, textvariable=self.time_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Interval Minutes:", width=16, anchor="w").grid(row=13, column=0, sticky="w", pady=3)
-        Entry(form, textvariable=self.minutes_var, width=42).grid(row=13, column=1, sticky="ew", pady=3)
+        Label(form, text="Interval Minutes:", width=16, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        Entry(form, textvariable=self.minutes_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Checkbutton(form, text="Enabled", variable=self.enabled_var).grid(row=14, column=1, sticky="w", pady=3)
+        Checkbutton(form, text="Enabled", variable=self.enabled_var).grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
         self.info = Text(right, wrap="word", height=10)
         self.info.pack(fill=BOTH, expand=True, pady=(12, 0))

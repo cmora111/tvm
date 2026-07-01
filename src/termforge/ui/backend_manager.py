@@ -106,12 +106,14 @@ class BackendManagerWindow:
         tmux_frame = Frame(body)
         tmux_frame.pack(fill=X, pady=(8, 8))
 
+        row = 0
+
         Label(
             tmux_frame,
             text="Tmux Session:",
             width=14,
             anchor="w",
-        ).grid(row=0, column=0, sticky="w", pady=3)
+        ).grid(row=row, column=0, sticky="w", pady=3)
 
         self.tmux_session_var = StringVar(
             value=str(getattr(app.cfg, "TmuxSession", "termforge"))
@@ -121,14 +123,15 @@ class BackendManagerWindow:
             tmux_frame,
             textvariable=self.tmux_session_var,
             width=32,
-        ).grid(row=0, column=1, sticky="w", pady=3)
+        ).grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
         Label(
             tmux_frame,
             text="Tmux Pane:",
             width=14,
             anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=3)
+        ).grid(row=row, column=0, sticky="w", pady=3)
 
         self.tmux_pane_var = StringVar(
             value=str(getattr(app.cfg, "TmuxPane", ""))
@@ -138,7 +141,7 @@ class BackendManagerWindow:
             tmux_frame,
             textvariable=self.tmux_pane_var,
             width=32,
-        ).grid(row=1, column=1, sticky="w", pady=3)
+        ).grid(row=row, column=1, sticky="w", pady=3)
 
         self.backend_menu.config(width=32)
         self.backend_menu.pack(anchor="w", pady=(0, 8))

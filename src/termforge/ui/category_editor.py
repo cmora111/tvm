@@ -263,34 +263,42 @@ class CommandEditorWindow:
         form = Frame(right)
         form.pack(fill=X)
 
-        Label(form, text="Category:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
+        row = 0
+
+        Label(form, text="Category:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.category_var = StringVar()
-        Entry(form, textvariable=self.category_var, width=42).grid(row=0, column=1, sticky="ew", pady=3)
+        Entry(form, textvariable=self.category_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Command Name:", width=14, anchor="w").grid(row=1, column=0, sticky="w", pady=3)
+        Label(form, text="Command Name:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.name_var = StringVar()
-        Entry(form, textvariable=self.name_var, width=42).grid(row=1, column=1, sticky="ew", pady=3)
+        Entry(form, textvariable=self.name_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Type:", width=14, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
+        Label(form, text="Type:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.type_var = StringVar(value="2")
         self.type_entry = Entry(form, textvariable=self.type_var, width=42)
-        self.type_entry.grid(row=2, column=1, sticky="ew", pady=3)
+        self.type_entry.grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
         self.command_label = Label(form, text="Command:", width=14, anchor="nw")
-        self.command_label.grid(row=3, column=0, sticky="nw", pady=3)
+        self.command_label.grid(row=row, column=0, sticky="nw", pady=3)
         self.command_text = Text(form, height=14, width=70, wrap="word")
-        self.command_text.grid(row=3, column=1, sticky="nsew", pady=3)
+        self.command_text.grid(row=row, column=1, sticky="nsew", pady=3)
+        row += 1
 
         builder_row = Frame(form)
-        builder_row.grid(row=4, column=1, sticky="w", pady=(0, 6))
+        builder_row.grid(row=row, column=1, sticky="w", pady=(0, 6))
         self.builder_button = Button(builder_row, text="Visual Chain Builder", bg="#2f5597", fg="white", command=self.open_chain_builder)
         self.builder_button.pack(side=LEFT)
         self.chain_hint = Label(builder_row, text="Use this for type = chain", fg="#333333")
         self.chain_hint.pack(side=LEFT, padx=(8, 0))
+        row += 1
 
-        Label(form, text="Options JSON:", width=14, anchor="nw").grid(row=5, column=0, sticky="nw", pady=3)
+        Label(form, text="Options JSON:", width=14, anchor="nw").grid(row=row, column=0, sticky="nw", pady=3)
         self.options_text = Text(form, height=5, width=70, wrap="word")
-        self.options_text.grid(row=5, column=1, sticky="nsew", pady=3)
+        self.options_text.grid(row=row, column=1, sticky="nsew", pady=3)
+        row += 1
 
         form.grid_columnconfigure(1, weight=1)
 

@@ -109,8 +109,10 @@ class WorkflowLiveMonitorWindow:
 
         self.listbox.configure(yscrollcommand=list_scroll.set)
 
-        self.listbox.grid(row=0, column=0, sticky="nsew")
-        list_scroll.grid(row=0, column=1, sticky="ns")
+        row = 0
+
+        self.listbox.grid(row=row, column=0, sticky="nsew")
+        list_scroll.grid(row=row, column=1, sticky="ns")
 
         Label(
             middle,
@@ -139,8 +141,11 @@ class WorkflowLiveMonitorWindow:
 
         self.summary.configure(yscrollcommand=summary_scroll.set)
 
-        self.summary.grid(row=0, column=0, sticky="nsew")
-        summary_scroll.grid(row=0, column=1, sticky="ns")
+        row = 0
+
+        self.summary.grid(row=row, column=0, sticky="nsew")
+        summary_scroll.grid(row=row, column=1, sticky="ns")
+        row += 1
 
         Label(
             right,
@@ -171,14 +176,16 @@ class WorkflowLiveMonitorWindow:
             yscrollcommand=details_scroll_y.set,
         )
 
+        row = 0
+
         self.details.grid(
-            row=0,
+            row=row,
             column=0,
             sticky="nsew",
         )
 
         details_scroll_y.grid(
-            row=0,
+            row=row,
             column=1,
             sticky="ns",
         )

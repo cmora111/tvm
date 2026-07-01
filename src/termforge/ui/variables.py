@@ -51,13 +51,17 @@ class VariableManagerWindow:
         form = Frame(right)
         form.pack(fill=X)
 
-        Label(form, text="Name:", width=12, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
-        self.name_var = StringVar()
-        Entry(form, textvariable=self.name_var, width=50).grid(row=0, column=1, sticky="ew", pady=3)
+        row = 0
 
-        Label(form, text="Value:", width=12, anchor="nw").grid(row=1, column=0, sticky="nw", pady=3)
+        Label(form, text="Name:", width=12, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        self.name_var = StringVar()
+        Entry(form, textvariable=self.name_var, width=50).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
+
+        Label(form, text="Value:", width=12, anchor="nw").grid(row=row, column=0, sticky="nw", pady=3)
         self.value_text = Text(form, height=5, width=60, wrap="word")
-        self.value_text.grid(row=1, column=1, sticky="nsew", pady=3)
+        self.value_text.grid(row=row, column=1, sticky="nsew", pady=3)
+        row += 1
 
         form.columnconfigure(1, weight=1)
 

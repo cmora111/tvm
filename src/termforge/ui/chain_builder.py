@@ -82,25 +82,30 @@ class ChainBuilderWindow:
         form = Frame(right)
         form.pack(fill=X)
 
-        Label(form, text="Step Kind:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
+        row = 0
+
+        Label(form, text="Step Kind:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.kind_var = StringVar(value="send")
         kind_menu = OptionMenu(form, self.kind_var, *self.STEP_KINDS)
         kind_menu.config(width=38)
-        kind_menu.grid(row=0, column=1, sticky="w", pady=3)
+        kind_menu.grid(row=row, column=1, sticky="w", pady=3)
+        row += 1
 
         self.value_label = Label(form, text="Value:", width=14, anchor="nw")
-        self.value_label.grid(row=1, column=0, sticky="nw", pady=3)
+        self.value_label.grid(row=row, column=0, sticky="nw", pady=3)
         self.value_text = Text(form, height=7, width=70, wrap="word")
-        self.value_text.grid(row=1, column=1, sticky="nsew", pady=3)
+        self.value_text.grid(row=row, column=1, sticky="nsew", pady=3)
 
         self.profile_var = StringVar()
         self.profile_menu = OptionMenu(form, self.profile_var, "")
         self.profile_menu.config(width=38)
-        self.profile_menu.grid(row=1, column=1, sticky="w", pady=3)
+        self.profile_menu.grid(row=row, column=1, sticky="w", pady=3)
         self.profile_menu.grid_remove()
+        row += 1
 
         self.hint_var = StringVar(value="")
-        Label(form, textvariable=self.hint_var, anchor="w", fg="#333333").grid(row=2, column=1, sticky="w", pady=(0, 6))
+        Label(form, textvariable=self.hint_var, anchor="w",
+              fg="#333333").grid(row=row, column=1, sticky="w", pady=(0, 6))
 
         help_box = Text(right, height=14, wrap="word")
         help_box.pack(fill=BOTH, expand=True, pady=(10, 0))

@@ -78,12 +78,15 @@ class WorkflowVariablesWindow:
         details_frame.columnconfigure(1, weight=0)
         details_frame.rowconfigure(0, weight=1)
 
+        row = 0
+
         self.details = Text(details_frame, wrap="none")
-        self.details.grid(row=0, column=0, sticky="nsew")
+        self.details.grid(row=row, column=0, sticky="nsew")
 
         details_scroll = Scrollbar(details_frame, orient=VERTICAL, command=self.details.yview)
-        details_scroll.grid(row=0, column=1, sticky="ns")
+        details_scroll.grid(row=row, column=1, sticky="ns")
         self.details.config(yscrollcommand=details_scroll.set)
+        row += 1
 
         self.snapshot = []
         self.listbox.bind("<<ListboxSelect>>", self.on_select)

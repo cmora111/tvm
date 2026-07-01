@@ -33,11 +33,24 @@ class BackupManagerWindow:
         for i in range(3):
             action_row.columnconfigure(i, weight=1)
 
-        Button(action_row, text="Project Snapshot", bg="#2e8b57", fg="white", activebackground="#3ca06a", activeforeground="white", command=self.create_project_snapshot,).grid(row=0, column=0, sticky="ew", padx=2, pady=2)
-        Button(action_row, text="Refresh", command=self.refresh, **button_style("primary"),).grid(row=0, column=1, sticky="ew", padx=2, pady=2)
-        Button(action_row, text="Restore", bg="#b8860b", fg="black", activebackground="#d4a017", activeforeground="black", command=self.restore_selected,).grid(row=0, column=2, sticky="ew", padx=2, pady=2)
-        Button( action_row, text="Export", bg="#5b4b8a", fg="white", activebackground="#7460aa", activeforeground="white", command=self.export_selected,).grid(row=1, column=0, sticky="ew", padx=2, pady=2)
-        Button(action_row, text="Close", bg="#b22222", fg="white", activebackground="#d63c3c", activeforeground="white", command=self.window.destroy,).grid(row=1, column=2, sticky="ew", padx=2, pady=2)
+        row = 0
+
+        Button(action_row, text="Project Snapshot", bg="#2e8b57", fg="white",
+               activebackground="#3ca06a", activeforeground="white",
+               command=self.create_project_snapshot,).grid(row=row, column=0, sticky="ew", padx=2, pady=2)
+        Button(action_row, text="Refresh", command=self.refresh, **button_style("primary"),).grid(row=row, column=1, sticky="ew", padx=2, pady=2)
+        Button(action_row, text="Restore", bg="#b8860b", fg="black",
+               activebackground="#d4a017", activeforeground="black",
+               command=self.restore_selected,).grid(row=row, column=2, sticky="ew", padx=2, pady=2)
+        row += 1
+
+        Button( action_row, text="Export", bg="#5b4b8a", fg="white",
+               activebackground="#7460aa", activeforeground="white",
+               command=self.export_selected,).grid(row=row, column=0, sticky="ew", padx=2, pady=2)
+        Button(action_row, text="Close", bg="#b22222", fg="white",
+               activebackground="#d63c3c", activeforeground="white",
+               command=self.window.destroy,).grid(row=row, column=2, sticky="ew", padx=2, pady=2)
+        row += 1
 
         body = Frame(outer)
         body.pack(fill=BOTH, expand=True)

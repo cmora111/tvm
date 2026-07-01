@@ -45,19 +45,24 @@ class HotkeyEditorWindow:
         form = Frame(right)
         form.pack(fill=X)
 
-        Label(form, text="Hotkey:", width=14, anchor="w").grid(row=0, column=0, sticky="w", pady=3)
-        self.hotkey_var = StringVar()
-        Entry(form, textvariable=self.hotkey_var, width=42).grid(row=0, column=1, sticky="ew", pady=3)
+        row = 0
 
-        Label(form, text="Category:", width=14, anchor="w").grid(row=1, column=0, sticky="w", pady=3)
+        Label(form, text="Hotkey:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
+        self.hotkey_var = StringVar()
+        Entry(form, textvariable=self.hotkey_var, width=42).grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
+
+        Label(form, text="Category:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.category_var = StringVar()
         self.category_entry = Entry(form, textvariable=self.category_var, width=42)
-        self.category_entry.grid(row=1, column=1, sticky="ew", pady=3)
+        self.category_entry.grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
-        Label(form, text="Command:", width=14, anchor="w").grid(row=2, column=0, sticky="w", pady=3)
+        Label(form, text="Command:", width=14, anchor="w").grid(row=row, column=0, sticky="w", pady=3)
         self.command_var = StringVar()
         self.command_entry = Entry(form, textvariable=self.command_var, width=42)
-        self.command_entry.grid(row=2, column=1, sticky="ew", pady=3)
+        self.command_entry.grid(row=row, column=1, sticky="ew", pady=3)
+        row += 1
 
         form.grid_columnconfigure(1, weight=1)
 
