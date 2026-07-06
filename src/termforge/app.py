@@ -128,6 +128,7 @@ from tkinter import (
     filedialog,
     messagebox,
     PanedWindow,
+    simpledialog,
 )
 from .constants import (
     APP_NAME,
@@ -247,6 +248,7 @@ class TermForgeApp:
         self.current_workflow_state = None
         self.workflow_history = []
         self.workflow_output_vars = {}
+        self.variable_prompt_cache = {}
 
         self.backend = self.create_backend()
 
@@ -494,6 +496,26 @@ class TermForgeApp:
 
         def replace(match):
             name = match.group(1).strip()
+
+            if name.startswith("prompt:"):
+                prompt_label = name.split(":", 1)[1].strip() or "Enter value"
+
+                cache_key = f"prompt:{prompt_label}"
+
+                if cache_key in self.variable_prompt_cache:
+                    return self.variable_prompt_cache[cache_key]
+
+                value = simpledialog.askstring(
+                    "TermForge Variable Prompt",
+                    prompt_label,
+                    parent=getattr(self, "root", None),
+                )
+
+                if value is None:
+                    raise TermForgeError(f"Prompt cancelled: {prompt_label}")
+
+                self.variable_prompt_cache[cache_key] = value
+                return value
 
             if name in seen:
                 raise TermForgeError(
@@ -966,8 +988,6 @@ class TermForgeApp:
                 if isinstance(cmd_text, str):
                     cmd_text = self.resolve_workflow_output_vars(cmd_text)
 
-                    print("DEBUG resolved cmd_text:", repr(cmd_text), flush=True)
-
                 if is_subprocess_step:
                     backend = self.backend
 
@@ -1331,6 +1351,7 @@ class TermForgeApp:
         source: str = "workflow",
         start_at: str | None = None,
     ) -> None:
+        self.variable_prompt_cache = {}
         workflows = self.get_workflows()
         steps = workflows.get(name)
 
