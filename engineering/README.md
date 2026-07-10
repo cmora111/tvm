@@ -1,3 +1,34 @@
+# Engineering
+
+This directory contains the engineering artifacts for the TermForge project.
+
+Some collections are project-specific.
+
+Others are currently incubating the Engineering Knowledge Framework (EKF) and
+may eventually be extracted into the standalone EKF repository after they have
+been validated through real engineering practice.`
+
+engineering/
+
+Foundation/      [EKF]
+
+Framework/       [EKF]
+
+Standards/       [EKF]
+
+Templates/       [EKF]
+
+Architecture/    [Project]
+
+ADR/             [Project]
+
+Journal/         [Project]
+
+Research/        [Project]
+
+Roadmap/         [Project]
+
+
 # Engineering Library
 
 The Engineering Library preserves the engineering knowledge behind **The TermForge Project**.
@@ -11,7 +42,6 @@ The Engineering Library explains **why** it was designed that way.
 This directory exists to preserve architectural decisions, research, experiments, discussions, lessons learned, and the story of TermForge as it evolves.
 
 ## Collections
-
 - **Journal** — The engineering story of the project.
 - **Architecture** — Current and future system design.
 - **ADR** — Architecture Decision Records.
@@ -26,4 +56,5 @@ This directory exists to preserve architectural decisions, research, experiments
 ## Guiding Idea
 
 > The code explains what.  
-> The Engineering Library explains why.
+
+
