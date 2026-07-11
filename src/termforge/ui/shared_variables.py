@@ -182,9 +182,15 @@ class SharedVariableManagerWindow:
         self.test_result_text.config(state="disabled")
 
     def update_resolved_preview(self, *_args):
+        value = self.get_value_text()
+
+        if "${prompt:" in value:
+            self.set_resolved_text(
+                "<prompt — click Test to enter a value>"
+            )
+            return
+
         try:
-            self.app.variable_prompt_cache = {}
-            value = self.get_value_text()
             resolved = self.app.resolve_text_variables(value)
             self.set_resolved_text(resolved)
         except Exception as exc:
@@ -200,6 +206,10 @@ class SharedVariableManagerWindow:
         self.app.variable_prompt_cache = {}
 
         text = self.test_var.get().strip()
+
+        if not text:
+            self.set_test_result_text("")
+            return
 
         try:
             result = self.app.resolve_text_variables(text)
@@ -224,29 +234,36 @@ class SharedVariableManagerWindow:
             messagebox.showerror(
                 "Shared Variable",
                 "Variable name is required.",
+                parent=self.window,
             )
             return
 
-        if not hasattr(self.app.cfg, "SharedVariables"):
-            self.app.cfg.SharedVariables = {}
-
-        variables = getattr(self.app.cfg, "SharedVariables", {})
-
-        if not isinstance(variables, dict):
-            variables = {}
-
-        variables[name] = value
-        self.app.cfg.SharedVariables = variables
-
-        self.app.persist_full_config()
-        self.refresh()
-        self.update_resolved_preview()
-
         try:
-            self.tree.selection_set(name)
-            self.tree.see(name)
-        except Exception:
-            pass
+            self.app.set_shared_variable(name, value)
+
+            self.refresh()
+
+            if self.tree.exists(name):
+                self.tree.selection_set(name)
+                self.tree.focus(name)
+                self.tree.see(name)
+
+            if "${prompt:" in value:
+                self.set_resolved_text(
+                    "<prompt — use Test to supply a value>"
+                )
+            else:
+                self.set_resolved_text(
+                    self.app.resolve_text_variables(value)
+                )
+
+            self.app.set_status(f"Saved shared variable: {name}")
+
+        except Exception as exc:
+            self.app.show_traceback_window(
+                "Save Shared Variable Failed",
+                exc,
+            )
 
     def delete_variable(self):
         name = self.selected_item()

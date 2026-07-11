@@ -649,14 +649,39 @@ class TermForgeApp:
         return target
 
     def get_shared_variables(self) -> dict:
-        return svc_get_shared_variables(self.cfg)
+        variables = getattr(self.cfg, "SharedVariables", {})
+
+        if not isinstance(variables, dict):
+            variables = {}
+            setattr(self.cfg, "SharedVariables", variables)
+
+        return variables
+
 
     def set_shared_variable(self, name: str, value: str) -> None:
-        svc_set_shared_variable(self.cfg, name, value)
+        name = str(name).strip()
+
+        if not name:
+            raise TermForgeError("Shared variable name cannot be empty.")
+
+        variables = dict(self.get_shared_variables())
+        variables[name] = str(value)
+
+        setattr(self.cfg, "SharedVariables", variables)
+
         self.persist_full_config()
 
+
     def delete_shared_variable(self, name: str) -> None:
-        svc_delete_shared_variable(self.cfg, name)
+        name = str(name).strip()
+
+        variables = dict(self.get_shared_variables())
+
+        if name in variables:
+            del variables[name]
+
+        setattr(self.cfg, "SharedVariables", variables)
+
         self.persist_full_config()
 
     def resolve_shared_variables_in_text(self, text: str) -> str:
