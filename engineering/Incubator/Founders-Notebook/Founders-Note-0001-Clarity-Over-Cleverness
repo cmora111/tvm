@@ -1,0 +1,24 @@
+# Founder's Note 0001 — Clarity Over Cleverness
+
+## Observation
+
+We will never sacrifice clarity for cleverness.
+
+We choose simple over impressive.
+
+We choose understanding over complexity.
+
+We choose engineering over appearance.
+
+## Honest Inspection
+
+Ask:
+
+**"Would an engineer unfamiliar with this project understand this without additional explanation?"**
+
+If the answer is **no**, then the design, code, or documentation should be refined until clarity becomes the natural result.
+
+## Measure of Success
+
+If a future engineer can understand our work without knowing us, then we have succeeded.
+

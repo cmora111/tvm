@@ -1,0 +1,18 @@
+# Founder's Note 0003 — Purpose Before Possibility
+
+## Observation
+
+Directories should be created when they have a purpose, not when they have a possibility.
+
+## Honest Inspection
+
+Ask:
+
+> "If this directory were removed today, would the engineer lose understanding?"
+
+If the answer is **no**, the directory has not yet earned its place.
+
+## Measure of Success
+
+If every directory carries its own purpose, the structure will remain clear regardless of
+how large the project becomes.

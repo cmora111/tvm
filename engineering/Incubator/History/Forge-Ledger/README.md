@@ -1,26 +1,41 @@
-# Forge Ledger
+i# ⚒️ Forge Ledger
 
 ## Purpose
 
-The Forge Ledger preserves the defining milestones in the evolution of EKF.
+The Forge Ledger preserves the enduring engineering principles discovered while applying the Engineering Knowledge Framework.
 
-## What Qualifies as a Strike
+Unlike a project history, milestone log, or engineering journal, the Forge Ledger records the principles, insights, and truths uncovered through honest inspection and deliberate craftsmanship.
 
-A Strike records a major framework phase, cornerstone artifact, foundational architectural decision, graduation, release, or another event that permanently shaped EKF.
+Each entry, known as a **Strike**, captures a lesson worthy of preservation—an idea that shaped the philosophy of the project and is expected to remain valuable long after individual features, implementations, or technologies have changed.
 
-Routine edits and ordinary commits do not qualify.
+A Strike is not created because work was completed.
 
-## Naming Convention
+A Strike is created because understanding was gained.
 
-```text
-Strike-<four-digit-number>-<descriptive-title>
-```
+The Forge Ledger exists to ensure that the wisdom earned at the anvil is never lost.
 
-## Ledger
+---
 
-| Strike | Title | Significance |
-|---|---|---|
-| [0001](Strike-0001-The-First-Hammer-Strike/) | The First Hammer Strike | EKF officially entered active development. |
-| [0002](Strike-0002-The-First-Cornerstone/) | The First Cornerstone | The Preamble became the first approved Foundation artifact. |
+## What Belongs in the Forge Ledger
 
-> The Forge Ledger records turning points, not activity.
+A Strike records discoveries such as:
+
+* An engineering principle that changes how future decisions are made.
+* A philosophy uncovered through experience.
+* A lesson learned through honest inspection.
+* A timeless observation that strengthens the craft.
+
+---
+
+## What Does Not Belong in the Forge Ledger
+
+The Forge Ledger is **not** a changelog, release history, milestone tracker, or project journal.
+
+Those artifacts record **what happened**.
+
+The Forge Ledger records **what was learned**.
+
+---
+
+> **Every Strike represents understanding earned through craftsmanship.**
+

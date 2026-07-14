@@ -1,0 +1,20 @@
+# Founder's Note 0002 — Necessary Architecture
+
+## Observation
+
+A clean architecture is not one that contains everything.
+
+It is one that contains only what is necessary.
+
+## Honest Inspection
+
+Ask:
+
+**"If this component were removed today, would the engineer lose understanding or capability?"**
+
+If the answer is **no**, then it has not yet earned its place.
+
+## Measure of Success
+
+Every component carries its own purpose and contributes meaningfully to the engineer's understanding or workflow.
+
