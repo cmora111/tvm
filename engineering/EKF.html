@@ -1,0 +1,1338 @@
+have to leave, oh well
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>README</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#engineering" id="toc-engineering"><span
+class="toc-section-number">1</span> Engineering</a></li>
+<li><a href="#engineering-library" id="toc-engineering-library"><span
+class="toc-section-number">2</span> Engineering Library</a>
+<ul>
+<li><a href="#collections" id="toc-collections"><span
+class="toc-section-number">2.1</span> Collections</a></li>
+<li><a href="#guiding-idea" id="toc-guiding-idea"><span
+class="toc-section-number">2.2</span> Guiding Idea</a></li>
+</ul></li>
+<li><a href="#engineering-knowledge-framework-incubator"
+id="toc-engineering-knowledge-framework-incubator"><span
+class="toc-section-number">3</span> Engineering Knowledge Framework
+Incubator</a>
+<ul>
+<li><a href="#purpose" id="toc-purpose"><span
+class="toc-section-number">3.1</span> Purpose</a></li>
+<li><a href="#incubation-principle" id="toc-incubation-principle"><span
+class="toc-section-number">3.2</span> Incubation Principle</a></li>
+<li><a href="#collections-1" id="toc-collections-1"><span
+class="toc-section-number">3.3</span> Collections</a></li>
+<li><a href="#canonical-source" id="toc-canonical-source"><span
+class="toc-section-number">3.4</span> Canonical Source</a></li>
+<li><a href="#ownership-boundary" id="toc-ownership-boundary"><span
+class="toc-section-number">3.5</span> Ownership Boundary</a></li>
+<li><a href="#graduation" id="toc-graduation"><span
+class="toc-section-number">3.6</span> Graduation</a></li>
+</ul></li>
+<li><a href="#foundation" id="toc-foundation"><span
+class="toc-section-number">4</span> Foundation</a>
+<ul>
+<li><a href="#purpose-1" id="toc-purpose-1"><span
+class="toc-section-number">4.1</span> Purpose</a></li>
+</ul></li>
+<li><a href="#design-philosophy" id="toc-design-philosophy"><span
+class="toc-section-number">5</span> Design Philosophy</a></li>
+<li><a href="#contents" id="toc-contents"><span
+class="toc-section-number">6</span> Contents</a></li>
+<li><a href="#what-belongs-here" id="toc-what-belongs-here"><span
+class="toc-section-number">7</span> What Belongs Here</a></li>
+<li><a href="#what-does-not-belong-here"
+id="toc-what-does-not-belong-here"><span
+class="toc-section-number">8</span> What Does Not Belong Here</a></li>
+<li><a href="#relationship-to-the-framework"
+id="toc-relationship-to-the-framework"><span
+class="toc-section-number">9</span> Relationship to the
+Framework</a></li>
+<li><a href="#guiding-principle" id="toc-guiding-principle"><span
+class="toc-section-number">10</span> Guiding Principle</a></li>
+<li><a href="#mission" id="toc-mission"><span
+class="toc-section-number">11</span> Mission</a>
+<ul>
+<li><a href="#purpose-2" id="toc-purpose-2"><span
+class="toc-section-number">11.1</span> Purpose</a></li>
+<li><a href="#mission-statement" id="toc-mission-statement"><span
+class="toc-section-number">11.2</span> Mission Statement</a></li>
+<li><a href="#commitment" id="toc-commitment"><span
+class="toc-section-number">11.3</span> Commitment</a></li>
+<li><a href="#boundaries" id="toc-boundaries"><span
+class="toc-section-number">11.4</span> Boundaries</a></li>
+<li><a href="#review-status" id="toc-review-status"><span
+class="toc-section-number">11.5</span> Review Status</a></li>
+</ul></li>
+<li><a href="#vision" id="toc-vision"><span
+class="toc-section-number">12</span> Vision</a>
+<ul>
+<li><a href="#status" id="toc-status"><span
+class="toc-section-number">12.1</span> Status</a></li>
+<li><a href="#purpose-3" id="toc-purpose-3"><span
+class="toc-section-number">12.2</span> Purpose</a></li>
+<li><a href="#working-vision" id="toc-working-vision"><span
+class="toc-section-number">12.3</span> Working Vision</a></li>
+</ul></li>
+<li><a href="#engineering-knowledge-lifecycle"
+id="toc-engineering-knowledge-lifecycle"><span
+class="toc-section-number">13</span> Engineering Knowledge Lifecycle</a>
+<ul>
+<li><a href="#opening-statement" id="toc-opening-statement"><span
+class="toc-section-number">13.1</span> Opening Statement</a></li>
+<li><a href="#purpose-4" id="toc-purpose-4"><span
+class="toc-section-number">13.2</span> Purpose</a></li>
+<li><a href="#the-lifecycle" id="toc-the-lifecycle"><span
+class="toc-section-number">13.3</span> The Lifecycle</a></li>
+<li><a href="#relationship-to-ekf" id="toc-relationship-to-ekf"><span
+class="toc-section-number">13.4</span> Relationship to EKF</a></li>
+<li><a href="#guiding-principle-1" id="toc-guiding-principle-1"><span
+class="toc-section-number">13.5</span> Guiding Principle</a></li>
+</ul></li>
+<li><a href="#the-constitution" id="toc-the-constitution"><span
+class="toc-section-number">14</span> The Constitution</a>
+<ul>
+<li><a
+href="#the-foundational-principles-of-the-engineering-knowledge-framework"
+id="toc-the-foundational-principles-of-the-engineering-knowledge-framework"><span
+class="toc-section-number">14.1</span> The Foundational Principles of
+the Engineering Knowledge Framework</a></li>
+<li><a href="#purpose-5" id="toc-purpose-5"><span
+class="toc-section-number">14.2</span> Purpose</a></li>
+<li><a href="#organization" id="toc-organization"><span
+class="toc-section-number">14.3</span> Organization</a></li>
+<li><a href="#authority" id="toc-authority"><span
+class="toc-section-number">14.4</span> Authority</a></li>
+<li><a href="#change-discipline" id="toc-change-discipline"><span
+class="toc-section-number">14.5</span> Change Discipline</a></li>
+</ul></li>
+<li><a href="#the-constitution-1" id="toc-the-constitution-1"><span
+class="toc-section-number">15</span> The Constitution</a>
+<ul>
+<li><a
+href="#the-foundational-principles-of-the-engineering-knowledge-framework-1"
+id="toc-the-foundational-principles-of-the-engineering-knowledge-framework-1"><span
+class="toc-section-number">15.1</span> The Foundational Principles of
+the Engineering Knowledge Framework</a>
+<ul>
+<li><a href="#preamble" id="toc-preamble"><span
+class="toc-section-number">15.1.1</span> Preamble</a></li>
+</ul></li>
+</ul></li>
+<li><a href="#constitutional-articles"
+id="toc-constitutional-articles"><span
+class="toc-section-number">16</span> Constitutional Articles</a>
+<ul>
+<li><a href="#purpose-6" id="toc-purpose-6"><span
+class="toc-section-number">16.1</span> Purpose</a></li>
+<li><a href="#articles" id="toc-articles"><span
+class="toc-section-number">16.2</span> Articles</a></li>
+<li><a href="#naming-convention" id="toc-naming-convention"><span
+class="toc-section-number">16.3</span> Naming Convention</a></li>
+<li><a href="#article-discipline" id="toc-article-discipline"><span
+class="toc-section-number">16.4</span> Article Discipline</a></li>
+</ul></li>
+<li><a href="#article-i-engineering-knowledge"
+id="toc-article-i-engineering-knowledge"><span
+class="toc-section-number">17</span> Article I — Engineering
+Knowledge</a>
+<ul>
+<li><a href="#purpose-7" id="toc-purpose-7"><span
+class="toc-section-number">17.1</span> Purpose</a></li>
+<li><a href="#declaration" id="toc-declaration"><span
+class="toc-section-number">17.2</span> Declaration</a></li>
+<li><a href="#constitutional-effect"
+id="toc-constitutional-effect"><span
+class="toc-section-number">17.3</span> Constitutional Effect</a></li>
+<li><a href="#relationship-to-future-articles"
+id="toc-relationship-to-future-articles"><span
+class="toc-section-number">17.4</span> Relationship to Future
+Articles</a></li>
+<li><a href="#engineering-principle"
+id="toc-engineering-principle"><span
+class="toc-section-number">17.5</span> Engineering Principle</a></li>
+<li><a href="#review-status-1" id="toc-review-status-1"><span
+class="toc-section-number">17.6</span> Review Status</a></li>
+</ul></li>
+<li><a href="#the-twelve-laws-of-engineering-knowledge"
+id="toc-the-twelve-laws-of-engineering-knowledge"><span
+class="toc-section-number">18</span> The Twelve Laws of Engineering
+Knowledge</a>
+<ul>
+<li><a href="#status-1" id="toc-status-1"><span
+class="toc-section-number">18.1</span> Status</a></li>
+<li><a href="#purpose-8" id="toc-purpose-8"><span
+class="toc-section-number">18.2</span> Purpose</a></li>
+<li><a href="#current-draft-laws" id="toc-current-draft-laws"><span
+class="toc-section-number">18.3</span> Current Draft Laws</a></li>
+</ul></li>
+<li><a href="#framework" id="toc-framework"><span
+class="toc-section-number">19</span> Framework</a>
+<ul>
+<li><a href="#purpose-9" id="toc-purpose-9"><span
+class="toc-section-number">19.1</span> Purpose</a></li>
+<li><a href="#current-working-artifacts"
+id="toc-current-working-artifacts"><span
+class="toc-section-number">19.2</span> Current Working
+Artifacts</a></li>
+<li><a href="#guiding-principle-2" id="toc-guiding-principle-2"><span
+class="toc-section-number">19.3</span> Guiding Principle</a></li>
+</ul></li>
+<li><a href="#standards" id="toc-standards"><span
+class="toc-section-number">20</span> Standards</a>
+<ul>
+<li><a href="#purpose-10" id="toc-purpose-10"><span
+class="toc-section-number">20.1</span> Purpose</a></li>
+<li><a href="#lifecycle" id="toc-lifecycle"><span
+class="toc-section-number">20.2</span> Lifecycle</a></li>
+</ul></li>
+<li><a href="#founders-notebook" id="toc-founders-notebook"><span
+class="toc-section-number">21</span> Founder’s Notebook</a>
+<ul>
+<li><a href="#purpose-11" id="toc-purpose-11"><span
+class="toc-section-number">21.1</span> Purpose</a></li>
+<li><a href="#relationship-to-the-forge-ledger"
+id="toc-relationship-to-the-forge-ledger"><span
+class="toc-section-number">21.2</span> Relationship to the Forge
+Ledger</a></li>
+<li><a href="#notes" id="toc-notes"><span
+class="toc-section-number">21.3</span> Notes</a></li>
+</ul></li>
+<li><a href="#history" id="toc-history"><span
+class="toc-section-number">22</span> History</a>
+<ul>
+<li><a href="#purpose-12" id="toc-purpose-12"><span
+class="toc-section-number">22.1</span> Purpose</a></li>
+<li><a href="#collections-2" id="toc-collections-2"><span
+class="toc-section-number">22.2</span> Collections</a></li>
+<li><a href="#what-does-not-belong-here-1"
+id="toc-what-does-not-belong-here-1"><span
+class="toc-section-number">22.3</span> What Does Not Belong
+Here</a></li>
+<li><a href="#purpose-13" id="toc-purpose-13"><span
+class="toc-section-number">22.4</span> Purpose</a></li>
+<li><a href="#what-belongs-in-the-forge-ledger"
+id="toc-what-belongs-in-the-forge-ledger"><span
+class="toc-section-number">22.5</span> What Belongs in the Forge
+Ledger</a></li>
+<li><a href="#what-does-not-belong-in-the-forge-ledger"
+id="toc-what-does-not-belong-in-the-forge-ledger"><span
+class="toc-section-number">22.6</span> What Does Not Belong in the Forge
+Ledger</a></li>
+</ul></li>
+<li><a href="#publishing" id="toc-publishing"><span
+class="toc-section-number">23</span> Publishing</a>
+<ul>
+<li><a href="#purpose-14" id="toc-purpose-14"><span
+class="toc-section-number">23.1</span> Purpose</a></li>
+<li><a href="#canonical-source-principle"
+id="toc-canonical-source-principle"><span
+class="toc-section-number">23.2</span> Canonical Source
+Principle</a></li>
+<li><a href="#guiding-maxim" id="toc-guiding-maxim"><span
+class="toc-section-number">23.3</span> Guiding Maxim</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 data-number="1" id="engineering"><span
+class="header-section-number">1</span> Engineering</h1>
+<p>This directory contains the engineering artifacts for the TermForge
+project.</p>
+<p>Some collections are project-specific.</p>
+<p>Others are currently incubating the Engineering Knowledge Framework
+(EKF) and may eventually be extracted into the standalone EKF repository
+after they have been validated through real engineering practice.`</p>
+<p>engineering/</p>
+<p>Foundation/ [EKF]</p>
+<p>Framework/ [EKF]</p>
+<p>Standards/ [EKF]</p>
+<p>Templates/ [EKF]</p>
+<p>Architecture/ [Project]</p>
+<p>ADR/ [Project]</p>
+<p>Journal/ [Project]</p>
+<p>Research/ [Project]</p>
+<p>Roadmap/ [Project]</p>
+<h1 data-number="2" id="engineering-library"><span
+class="header-section-number">2</span> Engineering Library</h1>
+<p>The Engineering Library preserves the engineering knowledge behind
+<strong>The TermForge Project</strong>.</p>
+<p>Source code explains <strong>what</strong> the software does.</p>
+<p>Documentation explains <strong>how</strong> to use it.</p>
+<p>The Engineering Library explains <strong>why</strong> it was designed
+that way.</p>
+<p>This directory exists to preserve architectural decisions, research,
+experiments, discussions, lessons learned, and the story of TermForge as
+it evolves.</p>
+<h2 data-number="2.1" id="collections"><span
+class="header-section-number">2.1</span> Collections</h2>
+<ul>
+<li><strong>Journal</strong> — The engineering story of the
+project.</li>
+<li><strong>Architecture</strong> — Current and future system
+design.</li>
+<li><strong>ADR</strong> — Architecture Decision Records.</li>
+<li><strong>Research</strong> — Investigations and experiments.</li>
+<li><strong>History</strong> — Timeline, releases, milestones, and
+conversations.</li>
+<li><strong>Roadmap</strong> — Future direction.</li>
+<li><strong>Forge-Sessions</strong> — Engineering discussions and
+decisions.</li>
+<li><strong>Notes</strong> — Important discoveries and lessons
+learned.</li>
+<li><strong>Constitution</strong> — Core beliefs of the project.</li>
+<li><strong>Principles</strong> — Engineering principles that guide
+development.</li>
+</ul>
+<h2 data-number="2.2" id="guiding-idea"><span
+class="header-section-number">2.2</span> Guiding Idea</h2>
+<blockquote>
+<p>The code explains what.</p>
+</blockquote>
+<h1 data-number="3" id="engineering-knowledge-framework-incubator"><span
+class="header-section-number">3</span> Engineering Knowledge Framework
+Incubator</h1>
+<h2 data-number="3.1" id="purpose"><span
+class="header-section-number">3.1</span> Purpose</h2>
+<p>The Incubator is the proving ground for the Engineering Knowledge
+Framework (EKF).</p>
+<p>EKF is being discovered and validated through real engineering
+practice before it is extracted into an independent project. The
+collections here contain framework-owned knowledge rather than
+project-specific engineering records.</p>
+<h2 data-number="3.2" id="incubation-principle"><span
+class="header-section-number">3.2</span> Incubation Principle</h2>
+<blockquote>
+<p>Patterns are discovered through practice before they are
+standardized.</p>
+</blockquote>
+<h2 data-number="3.3" id="collections-1"><span
+class="header-section-number">3.3</span> Collections</h2>
+<ul>
+<li><a href="Foundation/">Foundation</a></li>
+<li><a href="Framework/">Framework</a></li>
+<li><a href="History/">History</a></li>
+<li><a href="Publishing/">Publishing</a></li>
+<li><a href="Standards/">Standards</a></li>
+<li><a href="Templates/">Templates</a></li>
+</ul>
+<h2 data-number="3.4" id="canonical-source"><span
+class="header-section-number">3.4</span> Canonical Source</h2>
+<p>Markdown is the authoritative source format for EKF artifacts. PDF,
+DOCX, EPUB, HTML, websites, and printed books are generated publishing
+products.</p>
+<h2 data-number="3.5" id="ownership-boundary"><span
+class="header-section-number">3.5</span> Ownership Boundary</h2>
+<p>This Incubator contains knowledge that belongs to EKF.
+Project-specific engineering records remain outside it.</p>
+<h2 data-number="3.6" id="graduation"><span
+class="header-section-number">3.6</span> Graduation</h2>
+<p>A component may graduate only after it has demonstrated practical
+value, remained project-independent, and matured enough to serve other
+engineering projects.</p>
+<h1 data-number="4" id="foundation"><span
+class="header-section-number">4</span> Foundation</h1>
+<h2 data-number="4.1" id="purpose-1"><span
+class="header-section-number">4.1</span> Purpose</h2>
+<p>The Foundation contains the philosophical and constitutional
+artifacts of the Engineering Knowledge Framework (EKF).</p>
+<p>These artifacts define <strong>why</strong> the framework exists,
+<strong>what it believes</strong>, and <strong>the principles upon which
+it is built</strong>.</p>
+<p>Unlike standards, templates, or implementation guidance, the
+Foundation is intentionally small and changes very infrequently. Every
+artifact within this collection is considered foundational to the
+framework and should remain stable over time.</p>
+<p>The Foundation exists to provide a common understanding that guides
+every engineering decision made throughout the rest of the
+framework.</p>
+<hr />
+<h1 data-number="5" id="design-philosophy"><span
+class="header-section-number">5</span> Design Philosophy</h1>
+<p>The Foundation answers the questions that every engineering
+methodology must answer before defining processes or standards.</p>
+<ul>
+<li>Why does the framework exist?</li>
+<li>What is its purpose?</li>
+<li>What values guide its design?</li>
+<li>What principles should never change?</li>
+</ul>
+<p>These questions are answered before discussing implementation,
+standards, templates, or project-specific practices.</p>
+<hr />
+<h1 data-number="6" id="contents"><span
+class="header-section-number">6</span> Contents</h1>
+<table>
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 80%" />
+</colgroup>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Why EKF Exists</strong></td>
+<td>Declares the purpose and motivation for the framework.</td>
+</tr>
+<tr>
+<td><strong>Constitution</strong></td>
+<td>Defines the identity, philosophy, and enduring values of EKF.</td>
+</tr>
+<tr>
+<td><strong>Mission</strong></td>
+<td>Describes what the framework exists to accomplish.</td>
+</tr>
+<tr>
+<td><strong>Vision</strong></td>
+<td>Describes the long-term direction and aspirations of the
+framework.</td>
+</tr>
+<tr>
+<td><strong>Twelve Laws</strong></td>
+<td>Defines the fundamental engineering laws upon which the framework is
+built.</td>
+</tr>
+</tbody>
+</table>
+<p>Additional foundational artifacts may be added only when they define
+enduring concepts that support the framework as a whole.</p>
+<hr />
+<h1 data-number="7" id="what-belongs-here"><span
+class="header-section-number">7</span> What Belongs Here</h1>
+<p>The Foundation contains only artifacts that define the identity and
+philosophy of the Engineering Knowledge Framework.</p>
+<p>Typical artifacts include:</p>
+<ul>
+<li>Foundational declarations</li>
+<li>Constitutional documents</li>
+<li>Mission and vision statements</li>
+<li>Enduring engineering laws</li>
+<li>Core philosophical concepts</li>
+</ul>
+<p>These artifacts should remain project-independent and applicable to
+every implementation of the framework.</p>
+<hr />
+<h1 data-number="8" id="what-does-not-belong-here"><span
+class="header-section-number">8</span> What Does Not Belong Here</h1>
+<p>The Foundation does <strong>not</strong> contain implementation
+details.</p>
+<p>The following belong elsewhere within the framework:</p>
+<ul>
+<li>Engineering standards</li>
+<li>Templates</li>
+<li>Architecture documentation</li>
+<li>Research notes</li>
+<li>Project journals</li>
+<li>Architecture Decision Records (ADRs)</li>
+<li>Roadmaps</li>
+<li>Project-specific documentation</li>
+</ul>
+<p>Those artifacts build upon the Foundation but never define it.</p>
+<hr />
+<h1 data-number="9" id="relationship-to-the-framework"><span
+class="header-section-number">9</span> Relationship to the
+Framework</h1>
+<p>The Foundation is the bedrock of the Engineering Knowledge
+Framework.</p>
+<p>Every other collection derives its purpose from the Foundation.</p>
+<pre><code>Foundation
+    ↓
+Framework
+    ↓
+Standards
+    ↓
+Templates
+    ↓
+Project Engineering</code></pre>
+<p>As the framework evolves, implementation artifacts may change.</p>
+<p>The Foundation should change only with great care and only when the
+long-term philosophy of the framework itself evolves.</p>
+<hr />
+<h1 data-number="10" id="guiding-principle"><span
+class="header-section-number">10</span> Guiding Principle</h1>
+<blockquote>
+<p><strong>A strong engineering framework is built upon a strong
+foundation.</strong></p>
+</blockquote>
+<p>Every artifact within this collection exists to ensure that future
+engineering decisions remain consistent with the philosophy upon which
+the framework was founded.</p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<tbody>
+<tr>
+<td style="text-align: left;">Status</td>
+</tr>
+<tr>
+<td style="text-align: left;">EKF Incubator</td>
+</tr>
+<tr>
+<td style="text-align: left;">Future Home</td>
+</tr>
+<tr>
+<td style="text-align: left;">Engineering Knowledge Framework</td>
+</tr>
+<tr>
+<td style="text-align: left;">Current Home</td>
+</tr>
+<tr>
+<td style="text-align: left;">TermForge Engineering</td>
+</tr>
+<tr>
+<td style="text-align: left;"># Why EKF Exists</td>
+</tr>
+<tr>
+<td style="text-align: left;">## A Declaration</td>
+</tr>
+<tr>
+<td style="text-align: left;">Every engineering project creates more
+than source code.</td>
+</tr>
+<tr>
+<td style="text-align: left;">It creates ideas.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Questions.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Experiments.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Discoveries.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Trade-offs.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Failures.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Breakthroughs.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Architectural decisions.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Over time, these become the project’s
+engineering knowledge.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Unfortunately, that knowledge is often
+scattered across emails, issue trackers, chat conversations, notebooks,
+whiteboards, and the memories of the engineers who created it. As
+projects evolve and contributors change, much of that knowledge is
+gradually lost.</td>
+</tr>
+<tr>
+<td style="text-align: left;">The Engineering Knowledge Framework (EKF)
+exists to change that.</td>
+</tr>
+<tr>
+<td style="text-align: left;">EKF provides a practical, modular
+methodology for capturing, organizing, preserving, and communicating
+engineering knowledge throughout the lifetime of a project.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Its purpose is not to replace
+engineering.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Its purpose is to preserve the reasoning
+that engineering produces.</td>
+</tr>
+<tr>
+<td style="text-align: left;">EKF recognizes engineering knowledge as a
+first-class engineering artifact deserving the same discipline,
+craftsmanship, review, and long-term care as source code itself.</td>
+</tr>
+<tr>
+<td style="text-align: left;">The framework is intentionally
+project-agnostic.</td>
+</tr>
+<tr>
+<td style="text-align: left;">It is designed to support projects of
+every size and discipline, allowing each project to adopt only the
+components that provide value while maintaining a common philosophy for
+preserving engineering knowledge.</td>
+</tr>
+<tr>
+<td style="text-align: left;">EKF was not designed in isolation.</td>
+</tr>
+<tr>
+<td style="text-align: left;">It emerged through real engineering
+practice while building real software.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Every concept within the framework is
+expected to demonstrate practical value before becoming part of the
+framework itself.</td>
+</tr>
+<tr>
+<td style="text-align: left;">The framework serves engineering
+projects.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Engineering projects do not exist to serve
+the framework.</td>
+</tr>
+<tr>
+<td style="text-align: left;">As projects grow, they refine the
+framework.</td>
+</tr>
+<tr>
+<td style="text-align: left;">As the framework matures, it helps future
+projects preserve their knowledge more effectively.</td>
+</tr>
+<tr>
+<td style="text-align: left;">This continuous feedback creates an
+engineering ecosystem in which experience becomes understanding,
+understanding becomes knowledge, and knowledge becomes lasting
+engineering wisdom.</td>
+</tr>
+<tr>
+<td style="text-align: left;">EKF exists so that future engineers
+inherit more than source code.</td>
+</tr>
+<tr>
+<td style="text-align: left;">They inherit understanding.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Engineering knowledge deserves the same discipline as
+engineering code.</strong></p>
+</blockquote>
+<h1 data-number="11" id="mission"><span
+class="header-section-number">11</span> Mission</h1>
+<table>
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 82%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Status</td>
+<td>Draft</td>
+</tr>
+<tr>
+<td>Collection</td>
+<td>Foundation</td>
+</tr>
+<tr>
+<td>Version</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>Primary Question</td>
+<td>What has the Engineering Knowledge Framework committed itself to
+accomplish?</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 data-number="11.1" id="purpose-2"><span
+class="header-section-number">11.1</span> Purpose</h2>
+<p>The Mission defines what the Engineering Knowledge Framework exists
+to accomplish.</p>
+<p>It expresses the framework’s enduring commitment while remaining
+consistent with the Constitution and the Foundation.</p>
+<hr />
+<h2 data-number="11.2" id="mission-statement"><span
+class="header-section-number">11.2</span> Mission Statement</h2>
+<blockquote>
+<p><strong>The mission of the Engineering Knowledge Framework is to help
+engineers discover, organize, preserve, and communicate engineering
+knowledge so that understanding endures beyond the systems it
+creates.</strong></p>
+</blockquote>
+<hr />
+<h2 data-number="11.3" id="commitment"><span
+class="header-section-number">11.3</span> Commitment</h2>
+<p>The Engineering Knowledge Framework is committed to treating
+engineering knowledge as an enduring engineering asset.</p>
+<p>Through its Foundation, Framework, Standards, Templates, and
+supporting practices, EKF exists to help engineers preserve not only
+what they build, but also the understanding that gives their work
+meaning.</p>
+<hr />
+<h2 data-number="11.4" id="boundaries"><span
+class="header-section-number">11.4</span> Boundaries</h2>
+<p>The Mission defines what EKF is committed to accomplishing.</p>
+<p>It does not establish constitutional principles, prescribe
+implementation details, define engineering standards, or describe the
+framework’s long-term vision.</p>
+<hr />
+<h2 data-number="11.5" id="review-status"><span
+class="header-section-number">11.5</span> Review Status</h2>
+<p>This Mission is currently in the <strong>Draft</strong> stage.</p>
+<p>It shall remain under review until it has completed a cooling period,
+undergone honest inspection, and been formally approved as a Foundation
+artifact.</p>
+<h1 data-number="12" id="vision"><span
+class="header-section-number">12</span> Vision</h1>
+<h2 data-number="12.1" id="status"><span
+class="header-section-number">12.1</span> Status</h2>
+<p>Draft</p>
+<h2 data-number="12.2" id="purpose-3"><span
+class="header-section-number">12.2</span> Purpose</h2>
+<p>The Vision will describe the future EKF seeks to make possible.</p>
+<h2 data-number="12.3" id="working-vision"><span
+class="header-section-number">12.3</span> Working Vision</h2>
+<blockquote>
+<p>Engineering projects should leave future engineers not only working
+artifacts, but also the understanding required to maintain, improve, and
+responsibly inherit them.</p>
+</blockquote>
+<h1 data-number="13" id="engineering-knowledge-lifecycle"><span
+class="header-section-number">13</span> Engineering Knowledge
+Lifecycle</h1>
+<h2 data-number="13.1" id="opening-statement"><span
+class="header-section-number">13.1</span> Opening Statement</h2>
+<p>Engineering knowledge emerges through observation, investigation,
+experience, and honest inspection.</p>
+<p>It is not created in a single moment, nor is it acquired simply by
+reading documentation or implementing a solution. Engineering knowledge
+develops through deliberate inquiry, practical experience, thoughtful
+reflection, and the willingness to continually inspect both successes
+and failures.</p>
+<p>The Engineering Knowledge Lifecycle describes how engineering
+knowledge matures from an initial observation into understanding that
+can be preserved, refined, and shared with future engineers.</p>
+<hr />
+<h2 data-number="13.2" id="purpose-4"><span
+class="header-section-number">13.2</span> Purpose</h2>
+<p>The purpose of the Engineering Knowledge Lifecycle is to provide a
+common model for understanding how engineering knowledge is developed,
+validated, and preserved.</p>
+<p>Rather than focusing on documents or processes, the lifecycle focuses
+on the progression of engineering thought. Documents, standards,
+architecture decisions, and software implementations are artifacts
+produced during that journey; they are not the journey itself.</p>
+<p>By understanding this lifecycle, engineers gain a framework for
+recognizing where knowledge originates, how it matures, and when it has
+earned the confidence to become part of the Engineering Knowledge
+Framework.</p>
+<hr />
+<h2 data-number="13.3" id="the-lifecycle"><span
+class="header-section-number">13.3</span> The Lifecycle</h2>
+<p>Engineering knowledge develops through a deliberate progression.</p>
+<ol type="1">
+<li><p><strong>Observation</strong></p>
+<ul>
+<li>Recognizing something worthy of attention.</li>
+</ul></li>
+<li><p><strong>Investigation</strong></p>
+<ul>
+<li>Exploring observations through research, experimentation,
+discussion, and analysis.</li>
+</ul></li>
+<li><p><strong>Experience</strong></p>
+<ul>
+<li>Applying ideas in practice and learning from their outcomes.</li>
+</ul></li>
+<li><p><strong>Honest Inspection</strong></p>
+<ul>
+<li>Critically evaluating both successes and failures without attachment
+to previous assumptions.</li>
+</ul></li>
+<li><p><strong>Engineering Knowledge</strong></p>
+<ul>
+<li>Knowledge emerges when repeated observation, investigation,
+experience, and honest inspection produce understanding that has proven
+worthy of preservation.</li>
+</ul></li>
+</ol>
+<p>The lifecycle is iterative rather than linear. New observations may
+arise at any stage, beginning the cycle anew and continually refining
+existing knowledge.</p>
+<hr />
+<h2 data-number="13.4" id="relationship-to-ekf"><span
+class="header-section-number">13.4</span> Relationship to EKF</h2>
+<p>The Engineering Knowledge Framework does not create engineering
+knowledge.</p>
+<p>It preserves engineering knowledge that has emerged through
+disciplined engineering practice.</p>
+<p>Research, discussions, architecture decisions, implementations,
+standards, principles, and the Forge Ledger each represent different
+points within this lifecycle. Together they provide a structured means
+of preserving engineering knowledge so that future engineers may
+inspect, refine, and extend it.</p>
+<hr />
+<h2 data-number="13.5" id="guiding-principle-1"><span
+class="header-section-number">13.5</span> Guiding Principle</h2>
+<p>Engineering knowledge is not inherited.</p>
+<p>It is earned.</p>
+<p>The responsibility of EKF is to ensure that knowledge, once earned,
+is never unnecessarily lost.</p>
+<h1 data-number="14" id="the-constitution"><span
+class="header-section-number">14</span> The Constitution</h1>
+<h2 data-number="14.1"
+id="the-foundational-principles-of-the-engineering-knowledge-framework"><span
+class="header-section-number">14.1</span> The Foundational Principles of
+the Engineering Knowledge Framework</h2>
+<h2 data-number="14.2" id="purpose-5"><span
+class="header-section-number">14.2</span> Purpose</h2>
+<p>The Constitution defines the enduring identity and philosophy of
+EKF.</p>
+<h2 data-number="14.3" id="organization"><span
+class="header-section-number">14.3</span> Organization</h2>
+<ul>
+<li><a href="Preamble/">Preamble</a></li>
+<li><a href="Articles/">Articles</a></li>
+</ul>
+<h2 data-number="14.4" id="authority"><span
+class="header-section-number">14.4</span> Authority</h2>
+<p>The Constitution is the highest foundational artifact within EKF.
+Framework models, principles, standards, templates, and publishing
+practices must remain consistent with it.</p>
+<h2 data-number="14.5" id="change-discipline"><span
+class="header-section-number">14.5</span> Change Discipline</h2>
+<p>The Constitution changes only through deliberate review, a cooling
+period, and a recorded rationale.</p>
+<h1 data-number="15" id="the-constitution-1"><span
+class="header-section-number">15</span> The Constitution</h1>
+<h2 data-number="15.1"
+id="the-foundational-principles-of-the-engineering-knowledge-framework-1"><span
+class="header-section-number">15.1</span> The Foundational Principles of
+the Engineering Knowledge Framework</h2>
+<h3 data-number="15.1.1" id="preamble"><span
+class="header-section-number">15.1.1</span> Preamble</h3>
+<p>Engineering has always been more than the creation of systems.</p>
+<p>It is the pursuit of understanding.</p>
+<p>Every successful project is built upon thousands of decisions—some
+large, some small. Every experiment, every design discussion, every
+alternative considered, every lesson learned, and every refinement
+contributes to the engineering story.</p>
+<p>Yet too often, only the final result survives.</p>
+<p>Source code is preserved.</p>
+<p>Specifications are archived.</p>
+<p>Releases are published.</p>
+<p>The reasoning that gave those artifacts meaning is frequently
+lost.</p>
+<p>The Engineering Knowledge Framework was established from a simple
+conviction:</p>
+<blockquote>
+<p><strong>Engineering knowledge is a first-class engineering
+asset.</strong></p>
+</blockquote>
+<p>Knowledge deserves to be preserved with the same discipline, care,
+and craftsmanship as the systems it helps create.</p>
+<p>This Constitution establishes the enduring principles upon which the
+Engineering Knowledge Framework is built. It defines the philosophy that
+guides the framework, while allowing its methods, standards, and
+practices to evolve through experience.</p>
+<p>The purpose of this framework is not merely to document
+engineering.</p>
+<p>Its purpose is to preserve understanding.</p>
+<p>For the engineer working today.</p>
+<p>For the engineer who joins tomorrow.</p>
+<p>And for every engineer who will one day inherit the work we leave
+behind.</p>
+<h1 data-number="16" id="constitutional-articles"><span
+class="header-section-number">16</span> Constitutional Articles</h1>
+<h2 data-number="16.1" id="purpose-6"><span
+class="header-section-number">16.1</span> Purpose</h2>
+<p>The Articles express the enduring constitutional principles of the
+Engineering Knowledge Framework.</p>
+<h2 data-number="16.2" id="articles"><span
+class="header-section-number">16.2</span> Articles</h2>
+<ol type="1">
+<li><a href="Article-01-Engineering-Knowledge/">Article I — Engineering
+Knowledge</a></li>
+<li>Article II — Stewardship <em>(planned)</em></li>
+<li>Article III — Purpose <em>(planned)</em></li>
+<li>Article IV — Scope <em>(planned)</em></li>
+<li>Article V — Evolution <em>(planned)</em></li>
+</ol>
+<h2 data-number="16.3" id="naming-convention"><span
+class="header-section-number">16.3</span> Naming Convention</h2>
+<p>Filesystem names use zero-padded Arabic numerals. Published headings
+use Roman numerals.</p>
+<h2 data-number="16.4" id="article-discipline"><span
+class="header-section-number">16.4</span> Article Discipline</h2>
+<p>An Article declares enduring principles. It does not define
+operational standards, templates, technologies, or project-specific
+practices.</p>
+<h1 data-number="17" id="article-i-engineering-knowledge"><span
+class="header-section-number">17</span> Article I — Engineering
+Knowledge</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Status</td>
+<td>Draft</td>
+</tr>
+<tr>
+<td>Collection</td>
+<td>Constitution</td>
+</tr>
+<tr>
+<td>Version</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>Primary Question</td>
+<td>What is engineering knowledge?</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 data-number="17.1" id="purpose-7"><span
+class="header-section-number">17.1</span> Purpose</h2>
+<p>This Article defines engineering knowledge and establishes it as an
+engineering asset worthy of deliberate stewardship.</p>
+<p>It provides the constitutional foundation upon which the Engineering
+Knowledge Framework is built.</p>
+<hr />
+<h2 data-number="17.2" id="declaration"><span
+class="header-section-number">17.2</span> Declaration</h2>
+<blockquote>
+<p><strong>Engineering knowledge is the accumulated understanding that
+enables engineers to make informed decisions throughout the lifecycle of
+an engineered system.</strong></p>
+</blockquote>
+<p>Engineering knowledge extends beyond source code, specifications, and
+completed designs.</p>
+<p>It includes the reasoning, observations, assumptions, experiments,
+alternatives, experience, and lessons that give engineering artifacts
+their meaning.</p>
+<p>Engineering knowledge is created wherever engineers investigate
+problems, evaluate alternatives, make decisions, validate outcomes,
+communicate discoveries, and refine understanding through
+experience.</p>
+<p>Because engineering knowledge directly influences the quality,
+maintainability, safety, and evolution of engineered systems, it shall
+be regarded as an engineering asset worthy of deliberate
+stewardship.</p>
+<hr />
+<h2 data-number="17.3" id="constitutional-effect"><span
+class="header-section-number">17.3</span> Constitutional Effect</h2>
+<p>This Article establishes engineering knowledge as the central concern
+of the Engineering Knowledge Framework.</p>
+<p>All framework components, standards, templates, practices, and future
+constitutional articles shall support the discovery, organization,
+preservation, communication, and responsible stewardship of engineering
+knowledge.</p>
+<hr />
+<h2 data-number="17.4" id="relationship-to-future-articles"><span
+class="header-section-number">17.4</span> Relationship to Future
+Articles</h2>
+<p>This Article defines <strong>what engineering knowledge
+is</strong>.</p>
+<p>Subsequent Articles establish:</p>
+<ul>
+<li>the responsibility for preserving engineering knowledge,</li>
+<li>the purpose of the Engineering Knowledge Framework,</li>
+<li>the scope of the framework,</li>
+<li>and the principles governing its continued evolution.</li>
+</ul>
+<p>Nothing in a subsequent Article may contradict the definition
+established here.</p>
+<hr />
+<h2 data-number="17.5" id="engineering-principle"><span
+class="header-section-number">17.5</span> Engineering Principle</h2>
+<p>Engineering does not conclude when a system is completed.</p>
+<p>Engineering continues wherever understanding is preserved, shared,
+and used to make better decisions.</p>
+<hr />
+<h2 data-number="17.6" id="review-status-1"><span
+class="header-section-number">17.6</span> Review Status</h2>
+<p>This Article is currently in the <strong>Draft</strong> stage.</p>
+<p>It shall remain under review until it has completed a cooling period,
+undergone architectural inspection, and been formally approved as a
+Foundation artifact.</p>
+<p>Approval of this Article shall be recorded in the Forge Ledger.</p>
+<hr />
+<h1 data-number="18" id="the-twelve-laws-of-engineering-knowledge"><span
+class="header-section-number">18</span> The Twelve Laws of Engineering
+Knowledge</h1>
+<h2 data-number="18.1" id="status-1"><span
+class="header-section-number">18.1</span> Status</h2>
+<p>Draft</p>
+<h2 data-number="18.2" id="purpose-8"><span
+class="header-section-number">18.2</span> Purpose</h2>
+<p>The Twelve Laws will express the fundamental truths that guide how
+EKF treats engineering knowledge.</p>
+<h2 data-number="18.3" id="current-draft-laws"><span
+class="header-section-number">18.3</span> Current Draft Laws</h2>
+<ol type="1">
+<li>Engineering knowledge is a first-class engineering artifact.</li>
+<li>Preserve the reason, not merely the result.</li>
+<li>The framework serves the project.</li>
+<li>Discover before standardizing.</li>
+<li>Extract abstractions only after they have proven themselves.</li>
+<li>Every artifact must have a purpose.</li>
+<li>Knowledge should flow.</li>
+<li>Engineering should be explainable.</li>
+<li>Simplicity is a design goal.</li>
+<li>Preserve history honestly.</li>
+<li>Every project teaches the framework.</li>
+<li>Engineering is stewardship.</li>
+</ol>
+<h1 data-number="19" id="framework"><span
+class="header-section-number">19</span> Framework</h1>
+<h2 data-number="19.1" id="purpose-9"><span
+class="header-section-number">19.1</span> Purpose</h2>
+<p>The Framework collection explains how EKF organizes, develops, and
+preserves engineering knowledge.</p>
+<h2 data-number="19.2" id="current-working-artifacts"><span
+class="header-section-number">19.2</span> Current Working Artifacts</h2>
+<ul>
+<li><a href="Candidate-Components.md">Candidate Components</a></li>
+<li><a href="Core-Principles.md">Core Principles</a></li>
+<li><a href="Extraction-Checklist.md">Extraction Checklist</a></li>
+<li><a href="Graduation-Criteria.md">Graduation Criteria</a></li>
+<li><a href="Patterns.md">Patterns</a></li>
+<li><a href="Validation-Matrix.md">Validation Matrix</a></li>
+</ul>
+<h2 data-number="19.3" id="guiding-principle-2"><span
+class="header-section-number">19.3</span> Guiding Principle</h2>
+<blockquote>
+<p>The framework exists to serve engineering projects. Engineering
+projects do not exist to serve the framework.</p>
+</blockquote>
+<h1 data-number="20" id="standards"><span
+class="header-section-number">20</span> Standards</h1>
+<h2 data-number="20.1" id="purpose-10"><span
+class="header-section-number">20.1</span> Purpose</h2>
+<p>The Standards collection contains approved conventions that make EKF
+artifacts clear, consistent, and maintainable.</p>
+<h2 data-number="20.2" id="lifecycle"><span
+class="header-section-number">20.2</span> Lifecycle</h2>
+<pre class="text"><code>Practice → Observation → Candidate Pattern → Validation → Standard</code></pre>
+<p>Standards do not contain unvalidated ideas, constitutional
+philosophy, project-specific conventions, or templates without approved
+standards.</p>
+<h1 data-number="21" id="founders-notebook"><span
+class="header-section-number">21</span> Founder’s Notebook</h1>
+<h2 data-number="21.1" id="purpose-11"><span
+class="header-section-number">21.1</span> Purpose</h2>
+<p>The Founder’s Notebook preserves observations, instincts, questions,
+and emerging ideas discovered while forging the Engineering Knowledge
+Framework.</p>
+<p>A Founder’s Note is not yet an approved principle, standard, or Forge
+Ledger Strike. It provides a place for an idea to be preserved while
+experience and honest inspection determine whether it deserves a
+permanent role in EKF.</p>
+<h2 data-number="21.2" id="relationship-to-the-forge-ledger"><span
+class="header-section-number">21.2</span> Relationship to the Forge
+Ledger</h2>
+<p>The Founder’s Notebook records ideas that are still being
+considered.</p>
+<p>The Forge Ledger records enduring discoveries that have proven worthy
+of preservation.</p>
+<pre class="text"><code>Observation
+    ↓
+Founder&#39;s Notebook
+    ↓
+Engineering Experience
+    ↓
+Honest Inspection
+    ↓
+Forge Ledger or another EKF artifact</code></pre>
+<p>Not every Founder’s Note must graduate. Remaining a useful
+observation is an acceptable outcome.</p>
+<h2 data-number="21.3" id="notes"><span
+class="header-section-number">21.3</span> Notes</h2>
+<table>
+<colgroup>
+<col style="width: 62%" />
+<col style="width: 28%" />
+<col style="width: 8%" />
+</colgroup>
+<thead>
+<tr>
+<th>Note</th>
+<th>Title</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a
+href="Founders-Note-0001-Clarity-Over-Cleverness.md">0001</a></td>
+<td>Clarity Over Cleverness</td>
+<td>Observed</td>
+</tr>
+<tr>
+<td><a href="Founders-Note-0002-Necessary-Architecture.md">0002</a></td>
+<td>Necessary Architecture</td>
+<td>Observed</td>
+</tr>
+<tr>
+<td><a
+href="Founders-Note-0003-Purpose-Before-Possibility.md">0003</a></td>
+<td>Purpose Before Possibility</td>
+<td>Observed</td>
+</tr>
+</tbody>
+</table>
+<h1 data-number="22" id="history"><span
+class="header-section-number">22</span> History</h1>
+<h2 data-number="22.1" id="purpose-12"><span
+class="header-section-number">22.1</span> Purpose</h2>
+<p>The History collection preserves the evolution of the Engineering
+Knowledge Framework.</p>
+<h2 data-number="22.2" id="collections-2"><span
+class="header-section-number">22.2</span> Collections</h2>
+<ul>
+<li><a href="Forge-Ledger/">Forge Ledger</a></li>
+<li><a href="Timeline/">Timeline</a></li>
+<li><a href="Milestones/">Milestones</a></li>
+</ul>
+<h2 data-number="22.3" id="what-does-not-belong-here-1"><span
+class="header-section-number">22.3</span> What Does Not Belong Here</h2>
+<ul>
+<li>TermForge release history</li>
+<li>Routine commits</li>
+<li>Daily work logs</li>
+<li>Project-specific release reviews</li>
+</ul>
+<p>i# ⚒️ Forge Ledger</p>
+<h2 data-number="22.4" id="purpose-13"><span
+class="header-section-number">22.4</span> Purpose</h2>
+<p>The Forge Ledger preserves the enduring engineering principles
+discovered while applying the Engineering Knowledge Framework.</p>
+<p>Unlike a project history, milestone log, or engineering journal, the
+Forge Ledger records the principles, insights, and truths uncovered
+through honest inspection and deliberate craftsmanship.</p>
+<p>Each entry, known as a <strong>Strike</strong>, captures a lesson
+worthy of preservation—an idea that shaped the philosophy of the project
+and is expected to remain valuable long after individual features,
+implementations, or technologies have changed.</p>
+<p>A Strike is not created because work was completed.</p>
+<p>A Strike is created because understanding was gained.</p>
+<p>The Forge Ledger exists to ensure that the wisdom earned at the anvil
+is never lost.</p>
+<hr />
+<h2 data-number="22.5" id="what-belongs-in-the-forge-ledger"><span
+class="header-section-number">22.5</span> What Belongs in the Forge
+Ledger</h2>
+<p>A Strike records discoveries such as:</p>
+<ul>
+<li>An engineering principle that changes how future decisions are
+made.</li>
+<li>A philosophy uncovered through experience.</li>
+<li>A lesson learned through honest inspection.</li>
+<li>A timeless observation that strengthens the craft.</li>
+</ul>
+<hr />
+<h2 data-number="22.6"
+id="what-does-not-belong-in-the-forge-ledger"><span
+class="header-section-number">22.6</span> What Does Not Belong in the
+Forge Ledger</h2>
+<p>The Forge Ledger is <strong>not</strong> a changelog, release
+history, milestone tracker, or project journal.</p>
+<p>Those artifacts record <strong>what happened</strong>.</p>
+<p>The Forge Ledger records <strong>what was learned</strong>.</p>
+<hr />
+<blockquote>
+<p><strong>Every Strike represents understanding earned through
+craftsmanship.</strong></p>
+</blockquote>
+<h1 data-number="23" id="publishing"><span
+class="header-section-number">23</span> Publishing</h1>
+<h2 data-number="23.1" id="purpose-14"><span
+class="header-section-number">23.1</span> Purpose</h2>
+<p>The Publishing collection defines how canonical Markdown artifacts
+may be transformed into reader-facing products.</p>
+<h2 data-number="23.2" id="canonical-source-principle"><span
+class="header-section-number">23.2</span> Canonical Source
+Principle</h2>
+<p>Markdown is authoritative. PDF, DOCX, EPUB, HTML, website, and print
+outputs are generated.</p>
+<h2 data-number="23.3" id="guiding-maxim"><span
+class="header-section-number">23.3</span> Guiding Maxim</h2>
+<blockquote>
+<p><strong>Author once. Publish everywhere.</strong></p>
+</blockquote>
+</body>
+</html>

@@ -220,6 +220,15 @@ class SharedVariableManagerWindow:
         name = self.name_var.get().strip()
         value = self.get_value_text().strip()
 
+        print("DEBUG save name:", repr(name), flush=True)
+        print("DEBUG save value:", repr(value), flush=True)
+        self.app.set_shared_variable(name, value)
+        print(
+            "DEBUG saved variables:",
+            self.app.get_shared_variables(),
+            flush=True,
+        )
+
         if not name:
             messagebox.showerror(
                 "Shared Variable",
