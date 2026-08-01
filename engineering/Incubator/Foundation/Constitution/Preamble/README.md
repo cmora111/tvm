@@ -8,6 +8,9 @@ Engineering has always been more than the creation of systems.
 
 It is the pursuit of understanding.
 
+## Note:
+There is only one place I would hang a small inspection tag.
+
 Every successful project is built upon thousands of decisions—some large, some small. Every experiment, every design discussion, every alternative considered, every lesson learned, and every refinement contributes to the engineering story.
 
 Yet too often, only the final result survives.

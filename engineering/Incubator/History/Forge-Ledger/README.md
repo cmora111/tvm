@@ -1,4 +1,4 @@
-i# ⚒️ Forge Ledger
+## ⚒️ Forge Ledger
 
 ## Purpose
 
@@ -38,4 +38,9 @@ The Forge Ledger records **what was learned**.
 ---
 
 > **Every Strike represents understanding earned through craftsmanship.**
+
+## Note
+
+Just a candidate observation. Classification.
+Because we have become more precise craftsmen than we were when it was written.
 

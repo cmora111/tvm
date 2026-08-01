@@ -13,3 +13,7 @@ The Preamble became the first approved Foundation artifact.
 - The Preamble was approved without revision.
 - The first Foundation artifact reached approved status.
 - The Constitution was cleared to proceed to Article I.
+
+## Note
+
+One small question about the word "cleared."

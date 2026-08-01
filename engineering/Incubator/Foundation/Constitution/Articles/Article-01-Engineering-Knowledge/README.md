@@ -25,6 +25,13 @@ Engineering knowledge extends beyond source code, specifications, and completed 
 
 It includes the reasoning, observations, assumptions, experiments, alternatives, experience, and lessons that give engineering artifacts their meaning.
 
+(
+## Note ***
+)
+
+I'm saying it deserves inspection because of the vocabulary we've been forging.
+
+
 Engineering knowledge is created wherever engineers investigate problems, evaluate alternatives, make decisions, validate outcomes, communicate discoveries, and refine understanding through experience.
 
 Because engineering knowledge directly influences the quality, maintainability, safety, and evolution of engineered systems, it shall be regarded as an engineering asset worthy of deliberate stewardship.
@@ -57,6 +64,11 @@ Nothing in a subsequent Article may contradict the definition established here.
 ## Engineering Principle
 
 Engineering does not conclude when a system is completed.
+
+## Note:
+
+Candidate for constitutional fit.
+
 
 Engineering continues wherever understanding is preserved, shared, and used to make better decisions.
 
